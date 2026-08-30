@@ -3,5 +3,5 @@ gunicorn==22.0.0
 SQLAlchemy==2.0.30
 psycopg2-binary==2.9.9
 typing_extensions==4.12.2
-greenlet==3.0.3
+greenlet==2.0.2
 python-dotenv==1.0.1
