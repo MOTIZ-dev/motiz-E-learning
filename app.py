@@ -471,7 +471,15 @@ def community(username, user):
         posts = db.execute(sa.text("SELECT * FROM posts ORDER BY id DESC")).mappings().all()
 
     emoji_btns = "".join([f"<button type=button class=emoji-btn onclick=\"document.getElementById('post').value+='{e}';document.getElementById('emoji_box').style.display='none'\">{e}</button>" for e in emojis])
-    posts_html = "".join([f"<div class=card><b>{p['name']}</b>: {p['text']} {p['emoji']}<div style=margin-top:8px><form method=POST style='display:inline'><input type=hidden name=like_post_id value={p['id']}><button class=like-btn>🤍 Like ({len(json.loads(p['likes']))})</button></form>{'<form method=POST style=display:inline><input type=hidden name=delete_post_id value='+str(p['id'])+'><button class=btn.red style=padding:5px;font-size:0.8rem;margin-left:10px>Delete</button></form>' if is_admin else ''}</div><div class=comment-box><b>Comments:</b>{''.join([f'<div class=comment><b>{c["user"]}:</b> {c["text"]}</div>' for c in json.loads(p['comments'])]) or '<p style=font-size:0.8rem>No comments</p>'}<form method=POST><input type=hidden name=comment_post_id value={p['id']}><input name=comment_text placeholder='Write comment...' required style=width:75%;display:inline-block><button class='btn gray' style=width:23%;display:inline-block>Send</button></form></div></div>" for p in posts])
+    
+    posts_html = ""
+    for p in posts:
+        likes_count = len(json.loads(p['likes']))
+        comments_data = json.loads(p['comments'])
+        comments_html = "".join([f'<div class=comment><b>{c["user"]}:</b> {c["text"]}</div>' for c in comments_data]) or '<p style=font-size:0.8rem>No comments</p>'
+        delete_btn = f'<form method=POST style=display:inline><input type=hidden name=delete_post_id value={p["id"]}><button class=btn.red style=padding:5px;font-size:0.8rem;margin-left:10px>Delete</button></form>' if is_admin else ''
+        posts_html += f"<div class=card><b>{p['name']}</b>: {p['text']} {p['emoji']}<div style=margin-top:8px><form method=POST style='display:inline'><input type=hidden name=like_post_id value={p['id']}><button class=like-btn>🤍 Like ({likes_count})</button></form>{delete_btn}</div><div class=comment-box><b>Comments:</b>{comments_html}<form method=POST><input type=hidden name=comment_post_id value={p['id']}><input name=comment_text placeholder='Write comment...' required style=width:75%;display:inline-block><button class='btn gray' style=width:23%;display:inline-block>Send</button></form></div></div>"
+    
     emoji_js = """<script>function toggleEmoji(){let x=document.getElementById('emoji_box');x.style.display=x.style.display=='block'?'none':'block'}</script>"""
     return render_template_string(BASE, title="Community", header=Markup(get_header(username,user)), content=Markup(f"<div class=card><h2>Community</h2><form method=POST><textarea name=post id=post placeholder='Whats on your mind?' required></textarea><button type=button class='btn gray' onclick=toggleEmoji()>😀 Add Emoji</button><div id=emoji_box class=emoji-box>{emoji_btns}</div><button class=btn>Post</button><input type=hidden name=new_post value=1></form></div>{posts_html}"), timer_script=Markup(emoji_js))
 # ===== PAYMENT =====
