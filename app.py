@@ -336,12 +336,8 @@ def groups(nickname, user):
     create_form = f"<div class=card><h3>Create Group</h3><form method=POST><input name=group_name placeholder='Group Name' required><button name=create_group class=btn>Create</button></form></div>"
     content = f"{create_form}<div class=card><h3>My Groups</h3>{my_groups_html or '<p>No groups yet</p>'}</div>"
     return render_template_string(BASE, title="Groups", header=Markup(get_header(nickname,user)), content=Markup(content), timer_script="")
-            emoji TEXT,
-            likes TEXT DEFAULT '[]',
-            comments TEXT DEFAULT '[]'
-        );
-        """))
-        conn.execute(sa.text("""
+
+    conn.execute(sa.text("""
         CREATE TABLE IF NOT EXISTS dms (
             id SERIAL PRIMARY KEY,
             from_user TEXT,
