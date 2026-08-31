@@ -849,7 +849,7 @@ def admin():
     if not logged_in:
         return render_template_string(BASE, title="Admin", header="", content=Markup(f"<div class='card'><h2>🔒 Admin Login</h2>{error}<form method=POST><input type=password name=login_pass placeholder='Enter Admin Password' required><button class=btn>Login</button></form></div>"), timer_script="")
 
-    js = """<script>
+js = """<script>
     const subjects = %s;
     function updateDept(id){
         let c = document.getElementById(id+'_class').value;
@@ -865,7 +865,7 @@ def admin():
         let key = d? c+'_'+d : c;
         let s = document.getElementById(id+'_subject');
         s.innerHTML = '<option value="">Select Subject</option>';
-        (subjects[key] || []).forEach(sub => s.innerHTML += `<option>${sub}</option>`);
+        (subjects[key] || []).forEach(sub => s.innerHTML += '<option>' + sub + '</option>');
     }
     </script>""" % json.dumps(SUBJECTS)
 
