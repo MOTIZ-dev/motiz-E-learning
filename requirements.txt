@@ -3,3 +3,4 @@ SQLAlchemy
 pytz
 gunicorn
 markupsafe
+psycopg2-binary
