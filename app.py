@@ -640,7 +640,7 @@ form = f'\
 <label>Select Subject</label><select name="bulk_subject" id="bulk_subject" required><option value="">Select Subject</option></select>\
 <textarea name="bulk_text" rows="10" placeholder="What is 2+2?|3|4|5|6|4|Simple addition\nCapital of Nigeria?|Lagos|Abuja|Kano|PH|Abuja|FCT" required></textarea>\
 <button name="bulk_upload" class="btn blue">Upload Bulk Questions</button></form></div>'
-    return render_template_string(BASE, title="Admin", header="", content=Markup(form), timer_script=Markup(js))
+return render_template_string(BASE, title="Admin", header="", content=Markup(form), timer_script=Markup(js))
 
 @app.route('/profile')
 @login_required
