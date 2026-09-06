@@ -593,7 +593,6 @@ def admin():
                         if len(parts) >= 7: db.execute(sa.text("INSERT INTO questions (key, q, options, ans, exp) VALUES (:k, :q, :o, :a, :e)"),{"k": key, "q": parts[0], "o": json.dumps([parts[1],parts[2],parts[3],parts[4]]), "a": parts[5], "e": parts[6]}); count += 1
                     db.commit(); error = f"<div class=success>{count} Questions Added & Saved</div>"
                 if "new_notice" in request.form:
-                    # HEADING + SUBHEADING
                     notice = {"title": request.form["notice_title"], "text": request.form["new_notice"]}
                     notices = NOTICES + [notice]; ads = ADS + [notice]
                     set_setting("notices", json.dumps(notices)); set_setting("ads", json.dumps(ads)); error = "<div class=success>Notice/Ad Posted to Home</div>"
@@ -609,7 +608,7 @@ def admin():
     pending_html = "".join([f"<div class='card'><b>{r['name']}</b> for {r['type']}<br><small>Bank: {r.get('bank_used','N/A')} | Acc Name: {r.get('account_name','N/A')}</small><div style='display:flex;gap:5px'><form method=POST style='flex:1'><input type=hidden name=verify_id value={r['id']}><button class=btn>Verify</button></form><form method=POST style='flex:1'><input type=hidden name=deny_id value={r['id']}><button class='btn red'>Deny</button></form></div></div>" for r in pending_reqs])
     history_html = "".join([f"<div class='card' style='opacity:0.7'><b>{r['name']}</b> - {r['status']} for {r['type']}</div>" for r in history_reqs])
 
-form = f'\
+    form = f'\
 <div class="card"><h2>Admin Panel</h2>{error}</div>\
 <div class="card"><h2>Pending Payments</h2>{pending_html or "<p>No pending payments</p>"}</div>\
 <button type="button" class="btn gray collapsible" onclick="toggleHistory()"> View Verified/Denied History</button>\
@@ -640,7 +639,7 @@ form = f'\
 <label>Select Subject</label><select name="bulk_subject" id="bulk_subject" required><option value="">Select Subject</option></select>\
 <textarea name="bulk_text" rows="10" placeholder="What is 2+2?|3|4|5|6|4|Simple addition\nCapital of Nigeria?|Lagos|Abuja|Kano|PH|Abuja|FCT" required></textarea>\
 <button name="bulk_upload" class="btn blue">Upload Bulk Questions</button></form></div>'
-return render_template_string(BASE, title="Admin", header="", content=Markup(form), timer_script=Markup(js))
+    return render_template_string(BASE, title="Admin", header="", content=Markup(form), timer_script=Markup(js))
 
 @app.route('/profile')
 @login_required
