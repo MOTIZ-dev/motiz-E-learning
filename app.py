@@ -622,7 +622,7 @@ def admin():
     <button type=button class='btn gray collapsible' onclick=toggleHistory()> View Verified/Denied History</button>
     <div id=history_box class=collapsed-content><div class='card'><h3>Payment History</h3>{history_html or '<p>No history</p>'}</div></div>
     <div class='card'><h2>Change Admin Password</h2><form method=POST><input type=password name=old_pass placeholder="Current Password" required><input type=password name=new_pass placeholder="New Password" required><button name=change_pass class=btn.orange>Change Password</button></form></div>
-    <div class='card'><h2>📖 Upload Lesson Note</h2><form method=POST>
+    <div class='card'><h2> Upload Lesson Note</h2><form method=POST>
     <label>Select Class</label><select name=lesson_class id=lesson_class onchange=updateDept("lesson") required><option value="">Select Class</option>{''.join([f'<option>{c}</option>' for c in CLASSES])}</select>
     <div id=lesson_dept_div></div>
     <label>Select Subject</label><select name=lesson_subject id=lesson_subject required><option value="">Select Subject</option></select>
