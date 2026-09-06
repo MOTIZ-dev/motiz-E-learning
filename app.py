@@ -531,15 +531,7 @@ def community(nickname, user):
         emoji_boxes += f"<div id=cgroup_{k} class=emoji-box>{btns}</div>"
 
 # FIXED: Added space in selector '#emoji_wrap_c.emoji-box'
-    emoji_js = f"""<script>
-    function showEmojiGroupC(id){{
-        document.querySelectorAll('#emoji_wrap_c.emoji-box').forEach(x=>x.style.display='none');
-        document.querySelectorAll('#emoji_wrap_c.emoji-box').forEach(x=>x.style.display='none');
-        document.getElementById('cgroup_'+id).style.display='block';
-        document.getElementById('ctab_'+id).classList.add('active');
-    }}
-    function toggleEmojiC(){{let x=document.getElementById('emoji_wrap_c');x.style.display=x.style.display=='block'?'none':'block'; if(x.style.display=='block') showEmojiGroupC('{list(EMOJI_GROUPS.keys())[0]}'); }}
-    </script>""”
+    emoji_js = f"<script>function showToast(msg){{let t = document.createElement('div'); t.innerText = '✅ ' + msg; t.style = 'position:fixed;bottom:20px;right:20px;background:#4CAF50;color:white;padding:12px 20px;border-radius:8px;z-index:9999;'; document.body.appendChild(t); setTimeout(()=>t.remove(),3000);}}</script>"
 
     posts_html = ""
     for p in posts:
