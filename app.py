@@ -617,22 +617,22 @@ def admin():
     pending_html = "".join([f"<div class='card'><b>{r['name']}</b> for {r['type']}<br><small>Bank: {r.get('bank_used','N/A')} | Acc Name: {r.get('account_name','N/A')}</small><div style='display:flex;gap:5px'><form method=POST style='flex:1'><input type=hidden name=verify_id value={r['id']}><button class=btn>Verify</button></form><form method=POST style='flex:1'><input type=hidden name=deny_id value={r['id']}><button class='btn red'>Deny</button></form></div></div>" for r in pending_reqs])
     history_html = "".join([f"<div class='card' style='opacity:0.7'><b>{r['name']}</b> - {r['status']} for {r['type']}</div>" for r in history_reqs])
 
-    form = f"""<div class='card'><h2>Admin Panel</h2>{error}</div>
+form = f"""<div class='card'><h2>Admin Panel</h2>{error}</div>
     <div class='card'><h2>Pending Payments</h2>{pending_html or '<p>No pending payments</p>'}</div>
     <button type=button class='btn gray collapsible' onclick=toggleHistory()> View Verified/Denied History</button>
     <div id=history_box class=collapsed-content><div class='card'><h3>Payment History</h3>{history_html or '<p>No history</p>'}</div></div>
-    <div class='card'><h2>Change Admin Password</h2><form method=POST><input type=password name=old_pass placeholder="Current Password" required><input type=password name=new_pass placeholder="New Password" required><button name=change_pass class=btn.orange>Change Password</button></form></div>
+    <div class='card'><h2>Change Admin Password</h2><form method=POST><input type=password name=old_pass placeholder="Current Password" required><input type=password name=new_pass placeholder="New Password" required><button name=change_pass class='btn orange'>Change Password</button></form></div>
     <div class='card'><h2> Upload Lesson Note</h2><form method=POST>
     <label>Select Class</label><select name=lesson_class id=lesson_class onchange=updateDept("lesson") required><option value="">Select Class</option>{''.join([f'<option>{c}</option>' for c in CLASSES])}</select>
     <div id=lesson_dept_div></div>
     <label>Select Subject</label><select name=lesson_subject id=lesson_subject required><option value="">Select Subject</option></select>
     <input name=lesson_title placeholder="Lesson Title e.g Algebra Basics" required>
     <textarea name=lesson_notes rows=8 placeholder="Paste lesson notes here..." required></textarea>
-    <button name=add_lesson class=btn.blue>Post Lesson</button></form></div>
+    <button name=add_lesson class='btn blue'>Post Lesson</button></form></div>
     <div class='card'><h2>Post General Notice / Ad</h2><form method=POST>
     <input name=notice_title placeholder="Notice Heading - Big Title" required>
     <textarea name=new_notice placeholder="Notice details / subheading" required></textarea>
-    <button class=btn.orange>Post Notice</button></form></div>
+    <button class='btn orange'>Post Notice</button></form></div>
     <div class='card'><h2>Add Single Question</h2><form method=POST>
     <label>Select Class</label><select name=admin_class id=admin_class onchange=updateDept("admin") required><option value="">Select Class</option>{''.join([f'<option>{c}</option>' for c in CLASSES])}</select>
     <div id=admin_dept_div></div>
@@ -646,7 +646,7 @@ def admin():
     <div id=bulk_dept_div></div>
     <label>Select Subject</label><select name=bulk_subject id=bulk_subject required><option value="">Select Subject</option></select>
     <textarea name=bulk_text rows=10 placeholder="What is 2+2?|3|4|5|6|4|Simple addition\nCapital of Nigeria?|Lagos|Abuja|Kano|PH|Abuja|FCT" required></textarea>
-    <button name=bulk_upload class=btn.blue>Upload Bulk Questions</button></form></div>"""
+    <button name=bulk_upload class='btn blue'>Upload Bulk Questions</button></form></div>"""
     return render_template_string(BASE, title="Admin", header="", content=Markup(form), timer_script=Markup(js))
 
 @app.route('/profile')
