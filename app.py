@@ -619,7 +619,7 @@ def admin():
 
     form = f"""<div class='card'><h2>Admin Panel</h2>{error}</div>
     <div class='card'><h2>Pending Payments</h2>{pending_html or '<p>No pending payments</p>'}</div>
-    <button type=button class='btn gray collapsible' onclick=toggleHistory()>📁 View Verified/Denied History</button>
+    <button type=button class='btn gray collapsible' onclick=toggleHistory()> View Verified/Denied History</button>
     <div id=history_box class=collapsed-content><div class='card'><h3>Payment History</h3>{history_html or '<p>No history</p>'}</div></div>
     <div class='card'><h2>Change Admin Password</h2><form method=POST><input type=password name=old_pass placeholder="Current Password" required><input type=password name=new_pass placeholder="New Password" required><button name=change_pass class=btn.orange>Change Password</button></form></div>
     <div class='card'><h2>📖 Upload Lesson Note</h2><form method=POST>
