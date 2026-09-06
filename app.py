@@ -556,7 +556,7 @@ def req_pay(nickname, user, t):
     price = QUESTION_PRICE if t=="questions" else LESSON_PRICE
     with DBSession() as db: pending = db.execute(sa.text("SELECT * FROM payments WHERE nickname=:u AND type=:t AND status='Pending'"), {"u": nickname, "t": t}).scalar()
     if pending: return render_template_string(BASE, title="Payment", header=Markup(get_header(nickname,user)), content=Markup("<div class=card><h2>⏳ Request Pending</h2><p>Wait for admin to verify</p></div>"), timer_script="")
-    copy_js = f"""<script>function copyAcc(){{navigator.clipboard.writeText('{PALMPAY_ACCOUNT}');alert('Account number copied!')}}</script>"""
+    copy_js = f"<script>function copyAcc(){{navigator.clipboard.writeText('{PALMPAY_ACCOUNT}');alert('Account number copied!')}}</script>"
     # TELLER ID FIELD REMOVED
     form = f"""<div class=card><h2>Pay &#8358;{price} to unlock</h2><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account:</b> {PALMPAY_ACCOUNT} <button class=copy-btn onclick=copyAcc()>Copy</button><br><b>Name:</b> {PALMPAY_NAME}</p><p style=color:orange;font-weight:bold>ADMIN WILL VERIFY WITHIN 24HRS</p><form method=POST action=/confirm/{t}><input name=bank_used placeholder="Bank you used to transfer e.g GTBank" required><input name=account_name placeholder="Account Name you used" required><button class=btn>I Have Paid</button></form></div>"""
     return render_template_string(BASE, title="Payment", header=Markup(get_header(nickname,user)), content=Markup(form), timer_script=Markup(copy_js))
