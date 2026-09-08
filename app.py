@@ -409,15 +409,15 @@ def group_chat(nickname, user, gid):
             btns = "".join([f"<button type=button class=emoji-btn onclick=\"document.getElementById('msg').value+='{e}'\">{e}</button>" for e in v.split()])
             emoji_boxes += f"<div id=group_{k} class=emoji-box>{btns}</div>"
 
-        emoji_js = f"""<script>
-        function showEmojiGroup(id){{
-            document.querySelectorAll('.emoji-box').forEach(x=>x.style.display='none');
-            document.querySelectorAll('.emoji-tab button').forEach(x=>x.classList.remove('active'));
-            document.getElementById('group_'+id).style.display='block';
-            document.getElementById('tab_'+id).classList.add('active');
-        }}
-        showEmojiGroup('{list(EMOJI_GROUPS.keys())[0]}');
-        </script>"""
+        emoji_js = Markup("""<script>
+function toggleEmojiC(){document.getElementById('emoji_wrap_c').style.display='block';showEmojiGroupC('😀 Smile')}
+function showEmojiGroupC(id){
+    document.querySelectorAll('#emoji_wrap_c .emoji-box').forEach(x=>x.style.display='none');
+    document.querySelectorAll('#emoji_tab_c button').forEach(x=>x.classList.remove('active'));
+    document.getElementById('cgroup_'+id).style.display='block';
+    document.getElementById('ctab_'+id).classList.add('active');
+}
+</script>""")
 
         if request.method=="POST":
             if "send_msg" in request.form:
