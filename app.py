@@ -294,16 +294,20 @@ def get_header(nickname,user, show_exit=True):
 
 @app.route('/')
 def splash():
-    return render_template_string("""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Welcome</title><meta http-equiv="refresh" content="10;url=/login"> /* FIX 17: 10 SECONDS */
+    return render_template_string("""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Welcome</title><meta http-equiv="refresh" content="10;url=/login">
 <style>body{margin:0;background:linear-gradient(135deg,#0f3460,#16213e);color:white;font-family:Segoe UI;display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;text-align:center;overflow:hidden}
 .logo{font-size:2.8rem;font-weight:bold;animation:glow 2s ease-in-out infinite alternate;line-height:1.2;z-index:10}
+.subtext{font-size:1.1rem;margin-top:10px;opacity:0.9;z-index:10} /* NEW TEXT */
 .loader{border:4px solid #fff3;border-top:4px solid white;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin-top:20px;z-index:10}
 @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+@keyframes glow{from{text-shadow:0 0 10px #fff}to{text-shadow:0 0 30px #2196f3}}
+.book{position:absolute;font-size:2.5rem;animation:bounce 2s infinite ease-in-out;z-index:1} /* FIXED */
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-30px)}}
 .b1{top:10%;left:15%;animation-delay:0s}.b2{top:20%;right:20%;animation-delay:0.5s}.b3{bottom:25%;left:10%;animation-delay:1s}
 .b4{bottom:15%;right:15%;animation-delay:1.5s}.b5{top:50%;left:5%;animation-delay:0.3s}
 </style></head><body>
 <div class="book b1">📖</div><div class="book b2">📓</div><div class="book b3">📒</div><div class="book b4">📜</div><div class="book b5">📑</div>
-<div class="logo">MOTIZ E-LEARNING INSTITUTION</div><div>Learn. Practice. Excel.</div><div class="loader"></div></body></html>""")
+<div class="logo">MOTIZ E-LEARNING INSTITUTION</div><div class="subtext">Learn. Practice. Excel.</div><div class="loader"></div></body></html>""")
 @app.route('/main')
 @login_required
 def main(nickname, user):
