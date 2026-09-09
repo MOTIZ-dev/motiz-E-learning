@@ -49,6 +49,10 @@ def init_db():
         conn.commit()
 
 init_db()
+
+with app.app_context():
+    init_db()
+
 def get_setting(key, default):
     with DBSession() as db:
         res = db.execute(sa.text("SELECT value FROM settings WHERE key=:k"), {"k": key}).scalar()
