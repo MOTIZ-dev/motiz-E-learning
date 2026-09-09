@@ -157,7 +157,7 @@ def splash():
 .b3{animation:orbit 3s linear infinite 2s}
 .bulb{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:4rem;z-index:10}
 </style></head><body>
-<div class="book-orbit"><div class="bulb">📖</div><div class="book b1">💡</div><div class="book b2"></div><div class="book b3"></div></div>
+<div class="book-orbit"><div class="bulb">📖</div><div class="book b1"></div><div class="book b2"></div><div class="book b3"></div></div>
 <div class="logo">MOTIZ E-LEARNING INSTITUTION</div><div class="subtext">Learn. Practice. Excel.</div><div class="progress-bar"><div class="progress-fill"></div></div></body></html>""")
 
 @app.route('/register', methods=["GET","POST"])
