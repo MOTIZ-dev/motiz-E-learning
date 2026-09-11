@@ -522,46 +522,48 @@ def admin(nickname, user):
     # FIXED JS: 3-STEP FLOW FOR BOTH QUESTIONS AND LESSONS - WORKS FOR JSS TOO
     js = Markup(f"""<script>
 const subjects = {json.dumps(SUBJECTS)};
-function updateDept(){
+function updateDept(){{
     let c = document.getElementById('admin_class').value;
     let dDiv = document.getElementById('admin_dept_div');
     let sDiv = document.getElementById('admin_subject_div');
-    dDiv.innerHTML = ''; sDiv.innerHTML = ''; // CLEAR BOTH FIRST
-    if(['SS1','SS2','SS3'].includes(c)){
+    dDiv.innerHTML = ''; sDiv.innerHTML = '';
+    if(['SS1','SS2','SS3'].includes(c)){{
         dDiv.innerHTML = '<label>Step 2: Select Department</label><select name=admin_dept id=admin_dept onchange=loadSubjects() required><option value="">Select Dept</option><option>Science</option><option>Commercial</option><option>Art</option></select>';
-    } else {
+    }} else {{
         dDiv.innerHTML = '<input type=hidden name=admin_dept value="">';
-    }
-    loadSubjects(); // ALWAYS CALL THIS
-}
-function loadSubjects(){
+    }}
+    loadSubjects();
+}}
+function loadSubjects(){{
     let c = document.getElementById('admin_class').value;
     let dEl = document.getElementById('admin_dept');
     let d = dEl? dEl.value : '';
     let key = d? c+'_'+d : c;
     let sDiv = document.getElementById('admin_subject_div');
-    sDiv.innerHTML = '<label>Step 3: Select Subject</label><select name=admin_subject required><option value="">Select Subject</option>' + (subjects[key] || []).map(sub => `<option value="${sub}">${sub}</option>`).join('') + '</select>';
-}
-function updateLessonDept(){
+    let options = (subjects[key] || []).map(function(sub){{ return '<option value="' + sub + '">' + sub + '</option>'; }}).join('');
+    sDiv.innerHTML = '<label>Step 3: Select Subject</label><select name=admin_subject required><option value="">Select Subject</option>' + options + '</select>';
+}}
+function updateLessonDept(){{
     let c = document.getElementById('lesson_class').value;
     let dDiv = document.getElementById('lesson_dept_div');
     let sDiv = document.getElementById('lesson_subject_div');
-    dDiv.innerHTML = ''; sDiv.innerHTML = ''; // CLEAR BOTH FIRST
-    if(['SS1','SS2','SS3'].includes(c)){
+    dDiv.innerHTML = ''; sDiv.innerHTML = '';
+    if(['SS1','SS2','SS3'].includes(c)){{
         dDiv.innerHTML = '<label>Step 2: Select Department</label><select name=lesson_dept id=lesson_dept onchange=loadLessonSubjects() required><option value="">Select Dept</option><option>Science</option><option>Commercial</option><option>Art</option></select>';
-    } else {
+    }} else {{
         dDiv.innerHTML = '<input type=hidden name=lesson_dept value="">';
-    }
-    loadLessonSubjects(); // ALWAYS CALL THIS
-}
-function loadLessonSubjects(){
+    }}
+    loadLessonSubjects();
+}}
+function loadLessonSubjects(){{
     let c = document.getElementById('lesson_class').value;
     let dEl = document.getElementById('lesson_dept');
     let d = dEl? dEl.value : '';
     let key = d? c+'_'+d : c;
     let sDiv = document.getElementById('lesson_subject_div');
-    sDiv.innerHTML = '<label>Step 3: Select Subject</label><select name=lesson_subject required><option value="">Select Subject</option>' + (subjects[key] || []).map(sub => `<option value="${sub}">${sub}</option>`).join('') + '</select>';
-}
+    let options = (subjects[key] || []).map(function(sub){{ return '<option value="' + sub + '">' + sub + '</option>'; }}).join('');
+    sDiv.innerHTML = '<label>Step 3: Select Subject</label><select name=lesson_subject required><option value="">Select Subject</option>' + options + '</select>';
+}}
 </script>""")
     with DBSession() as db:
         pending_reqs = db.execute(sa.text("SELECT * FROM payments WHERE status='Pending'")).mappings().all()
