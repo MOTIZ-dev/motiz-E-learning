@@ -526,12 +526,13 @@ function updateDept(){{
     let c = document.getElementById('admin_class').value;
     let dDiv = document.getElementById('admin_dept_div');
     let sDiv = document.getElementById('admin_subject_div');
-    dDiv.innerHTML = ''; sDiv.innerHTML = '';
+    dDiv.innerHTML = '';
     if(['SS1','SS2','SS3'].includes(c)){{
         dDiv.innerHTML = '<label>Step 2: Select Department</label><select name=admin_dept id=admin_dept onchange=loadSubjects() required><option value="">Select Dept</option><option>Science</option><option>Commercial</option><option>Art</option></select>';
+        sDiv.innerHTML = '<label>Step 3: Select Subject</label><select name=admin_subject required disabled><option>Select Dept First</option></select>';
     }} else {{
-        dDiv.innerHTML = '<input type=hidden name=admin_dept value="">'; // FOR JSS
-        loadSubjects();
+        dDiv.innerHTML = '<input type=hidden name=admin_dept value="">';
+        loadSubjects(); // Load JSS subjects immediately
     }}
 }}
 function loadSubjects(){{
@@ -546,12 +547,13 @@ function updateLessonDept(){{
     let c = document.getElementById('lesson_class').value;
     let dDiv = document.getElementById('lesson_dept_div');
     let sDiv = document.getElementById('lesson_subject_div');
-    dDiv.innerHTML = ''; sDiv.innerHTML = '';
+    dDiv.innerHTML = '';
     if(['SS1','SS2','SS3'].includes(c)){{
         dDiv.innerHTML = '<label>Step 2: Select Department</label><select name=lesson_dept id=lesson_dept onchange=loadLessonSubjects() required><option value="">Select Dept</option><option>Science</option><option>Commercial</option><option>Art</option></select>';
+        sDiv.innerHTML = '<label>Step 3: Select Subject</label><select name=lesson_subject required disabled><option>Select Dept First</option></select>';
     }} else {{
-        dDiv.innerHTML = '<input type=hidden name=lesson_dept value="">'; // FOR JSS
-        loadLessonSubjects();
+        dDiv.innerHTML = '<input type=hidden name=lesson_dept value="">';
+        loadLessonSubjects(); // Load JSS subjects immediately
     }}
 }}
 function loadLessonSubjects(){{
