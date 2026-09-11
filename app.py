@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 import pytz
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', "motiz_secret_key_2026_v11")
+app.secret_key = os.environ.get('SECRET_KEY', "motiz_secret_key_2026_v12")
 app.config['PROPAGATE_EXCEPTIONS'] = True
 
 # ====== RENDER DATABASE CONNECTION ======
@@ -31,7 +31,24 @@ PAID_Q = 70
 TIMER_PER_QUESTION = 120
 NIGERIA_TZ = pytz.timezone('Africa/Lagos')
 
-# ====== CREATE TABLES ======
+# ====== YOUR EXACT SUBJECT LIST ======
+JSS_SUBJECTS = ["English Language", "Mathematics", "Basic Science", "Basic Technology", "Social Studies", "Civic Education", "Business Studies", "Agricultural Science", "Christian / Islamic Religious Studies (CRS/IRS)", "Physical and Health Education (PHE)"]
+
+CLASSES = ["JSS1", "JSS2", "JSS3", "SS1", "SS2", "SS3"]
+SUBJECTS = {
+    "JSS1": JSS_SUBJECTS, "JSS2": JSS_SUBJECTS, "JSS3": JSS_SUBJECTS,
+    "SS1_Science": ["English Language", "Mathematics", "Civic Education", "Physics", "Chemistry", "Biology", "Further Mathematics", "ICT", "Agricultural Science", "Geography"],
+    "SS1_Commercial": ["English Language", "Mathematics", "Civic Education", "Economics", "Financial Accounting", "Commerce", "Business Management", "Government", "Computer Studies / ICT", "Marketing"],
+    "SS1_Art": ["English Language", "Mathematics", "Civic Education", "Literature in English", "Government", "Christian / Islamic Religious Studies (CRS/IRS)", "Yoruba", "Economics", "Computer Studies / ICT", "Craft"],
+    "SS2_Science": ["English Language", "Mathematics", "Civic Education", "Physics", "Chemistry", "Biology", "Further Mathematics", "ICT", "Agricultural Science", "Geography"],
+    "SS2_Commercial": ["English Language", "Mathematics", "Civic Education", "Economics", "Financial Accounting", "Commerce", "Business Management", "History", "Computer Studies / ICT", "Marketing"],
+    "SS2_Art": ["English Language", "Mathematics", "Civic Education", "Literature in English", "Government", "Christian / Islamic Religious Studies (CRS/IRS)", "Yoruba", "Economics", "Computer Studies / ICT", "Craft"],
+    "SS3_Science": ["English Language", "Mathematics", "Civic Education", "Physics", "Chemistry", "Biology", "Further Mathematics", "ICT", "Agricultural Science", "Geography"],
+    "SS3_Commercial": ["English Language", "Mathematics", "Civic Education", "Economics", "Financial Accounting", "Commerce", "Business Management", "Government", "Computer Studies / ICT", "Marketing"],
+    "SS3_Art": ["English Language", "Mathematics", "Civic Education", "Literature in English", "Government", "Christian / Islamic Religious Studies (CRS/IRS)", "Yoruba", "Economics", "Computer Studies / ICT", "Craft"]
+}
+
+# ====== CREATE TABLES + INITIAL DATA ======
 def init_db():
     with engine.connect() as conn:
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, nickname TEXT UNIQUE, name TEXT, password TEXT, class TEXT, dept TEXT, q_cycle TEXT DEFAULT 'free', q_used INTEGER DEFAULT 0, lesson_expiry DATE, correct INTEGER DEFAULT 0, wrong INTEGER DEFAULT 0, friends TEXT DEFAULT '[]', referred_by TEXT DEFAULT NULL, referral_count INTEGER DEFAULT 0, free_days INTEGER DEFAULT 0, is_verified BOOLEAN DEFAULT FALSE);"))
@@ -44,6 +61,48 @@ def init_db():
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS questions (id SERIAL PRIMARY KEY, key TEXT, q TEXT, options TEXT, ans TEXT);"))
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);"))
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS referrals (id SERIAL PRIMARY KEY, referrer TEXT, referred TEXT, paid BOOLEAN DEFAULT FALSE, bonus_given BOOLEAN DEFAULT FALSE);"))
+        conn.commit()
+
+        # ====== ADD INITIAL QUESTIONS AND LESSONS ======
+        q_count = conn.execute(sa.text("SELECT COUNT(*) FROM questions")).scalar()
+        if q_count == 0:
+            # 3 Sample Questions for each JSS Subject
+            for cls in ["JSS1","JSS2","JSS3"]:
+                for sub in JSS_SUBJECTS:
+                    key = f"{cls}_{sub}"
+                    conn.execute(sa.text("INSERT INTO questions (key,q,options,ans) VALUES (:k,:q,:o,:a)"),
+                    {"k":key,"q":f"What is the capital of Nigeria?","o":json.dumps(["Lagos","Abuja","Port Harcourt","Kano"]),"a":"Abuja"})
+                    conn.execute(sa.text("INSERT INTO questions (key,q,options,ans) VALUES (:k,:q,:o,:a)"),
+                    {"k":key,"q":f"2 + 2 =?","o":json.dumps(["3","4","5","6"]),"a":"4"})
+                    conn.execute(sa.text("INSERT INTO questions (key,q,options,ans) VALUES (:k,:q,:o,:a)"),
+                    {"k":key,"q":f"Which of these is a living thing?","o":json.dumps(["Stone","Car","Tree","Bottle"]),"a":"Tree"})
+
+            # 3 Sample Questions for each SS Subject
+            for cls in ["SS1","SS2","SS3"]:
+                for dept in ["Science","Commercial","Art"]:
+                    for sub in SUBJECTS[f"{cls}_{dept}"]:
+                        key = f"{cls}_{dept}_{sub}"
+                        conn.execute(sa.text("INSERT INTO questions (key,q,options,ans) VALUES (:k,:q,:o,:a)"),
+                        {"k":key,"q":f"What is the main function of mitochondria?","o":json.dumps(["Protein synthesis","Cell respiration","Cell division","Waste removal"]),"a":"Cell respiration"})
+                        conn.execute(sa.text("INSERT INTO questions (key,q,options,ans) VALUES (:k,:q,:o,:a)"),
+                        {"k":key,"q":f"Who is the president of Nigeria?","o":json.dumps(["Goodluck","Buhari","Tinubu","Obasanjo"]),"a":"Tinubu"})
+                        conn.execute(sa.text("INSERT INTO questions (key,q,options,ans) VALUES (:k,:q,:o,:a)"),
+                        {"k":key,"q":f"HTML stands for?","o":json.dumps(["Hyper Text Markup Language","High Tech Machine Language","Hyperlink Text Mark Language","None"]),"a":"Hyper Text Markup Language"})
+
+        l_count = conn.execute(sa.text("SELECT COUNT(*) FROM lessons")).scalar()
+        if l_count == 0:
+            # 1 Initial Lesson for each JSS Subject
+            for cls in ["JSS1","JSS2","JSS3"]:
+                for sub in JSS_SUBJECTS:
+                    conn.execute(sa.text("INSERT INTO lessons (class,dept,subject,title,notes,date) VALUES (:c,:d,:s,:t,:n,:date)"),
+                    {"c":cls,"d":"","s":sub,"t":f"Introduction to {sub}","n":f"This is the first lesson for {sub} in {cls}. Welcome to MOTIZ E-LEARNING. Study hard and practice daily.","date":str(date.today())})
+
+            # 1 Initial Lesson for each SS Subject
+            for cls in ["SS1","SS2","SS3"]:
+                for dept in ["Science","Commercial","Art"]:
+                    for sub in SUBJECTS[f"{cls}_{dept}"]:
+                        conn.execute(sa.text("INSERT INTO lessons (class,dept,subject,title,notes,date) VALUES (:c,:d,:s,:t,:n,:date)"),
+                        {"c":cls,"d":dept,"s":sub,"t":f"Introduction to {sub}","n":f"This is the first lesson for {sub} in {cls} {dept}. Welcome to MOTIZ E-LEARNING. Study hard and practice daily.","date":str(date.today())})
         conn.commit()
 
 init_db()
@@ -61,23 +120,6 @@ def set_setting(key, value):
 ADMIN_PASS = get_setting("admin_pass", ADMIN_PASS)
 NOTICES = json.loads(get_setting("notices", json.dumps([{"title":"Welcome","text":"Welcome to MOTIZ E-LEARNING!","created_at": str(datetime.now(NIGERIA_TZ))}])))
 PINNED_NOTICE = get_setting("pinned_notice", "")
-
-# ====== YOUR EXACT SUBJECT LIST ======
-JSS_SUBJECTS = ["English Language", "Mathematics", "Basic Science", "Basic Technology", "Social Studies", "Civic Education", "Business Studies", "Agricultural Science", "Christian / Islamic Religious Studies (CRS/IRS)", "Physical and Health Education (PHE)"]
-
-CLASSES = ["JSS1", "JSS2", "JSS3", "SS1", "SS2", "SS3"]
-SUBJECTS = {
-    "JSS1": JSS_SUBJECTS, "JSS2": JSS_SUBJECTS, "JSS3": JSS_SUBJECTS,
-    "SS1_Science": ["English Language", "Mathematics", "Civic Education", "Physics", "Chemistry", "Biology", "Further Mathematics", "ICT", "Agricultural Science", "Geography"],
-    "SS1_Commercial": ["English Language", "Mathematics", "Civic Education", "Economics", "Financial Accounting", "Commerce", "Business Management", "Government", "Computer Studies / ICT", "Marketing"],
-    "SS1_Art": ["English Language", "Mathematics", "Civic Education", "Literature in English", "Government", "Christian / Islamic Religious Studies (CRS/IRS)", "Yoruba", "Economics", "Computer Studies / ICT", "Craft"],
-    "SS2_Science": ["English Language", "Mathematics", "Civic Education", "Physics", "Chemistry", "Biology", "Further Mathematics", "ICT", "Agricultural Science", "Geography"],
-    "SS2_Commercial": ["English Language", "Mathematics", "Civic Education", "Economics", "Financial Accounting", "Commerce", "Business Management", "History", "Computer Studies / ICT", "Marketing"],
-    "SS2_Art": ["English Language", "Mathematics", "Civic Education", "Literature in English", "Government", "Christian / Islamic Religious Studies (CRS/IRS)", "Yoruba", "Economics", "Computer Studies / ICT", "Craft"],
-    "SS3_Science": ["English Language", "Mathematics", "Civic Education", "Physics", "Chemistry", "Biology", "Further Mathematics", "ICT", "Agricultural Science", "Geography"],
-    "SS3_Commercial": ["English Language", "Mathematics", "Civic Education", "Economics", "Financial Accounting", "Commerce", "Business Management", "Government", "Computer Studies / ICT", "Marketing"],
-    "SS3_Art": ["English Language", "Mathematics", "Civic Education", "Literature in English", "Government", "Christian / Islamic Religious Studies (CRS/IRS)", "Yoruba", "Economics", "Computer Studies / ICT", "Craft"]
-}
 
 def get_user():
     nickname = session.get("nickname")
@@ -97,7 +139,7 @@ def login_required(f):
         return f(nickname, user, *args, **kwargs)
     return wrapper
 
-# ====== BASE HTML WITH CLEAN SPLASH ======
+# ====== BASE HTML WITH FIXED SPLASH - BOOK MOVED UP TO 35% ======
 BASE = """<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{title}}</title><style>:root{--bg:#f0f2f5;--card:white;--text:#333;--primary:#0f3460} body.dark{--bg:#121212;--card:#1e1e1e;--text:#eee}
 body{font-family:Segoe UI;background:var(--bg);color:var(--text);margin:0;padding:0;padding-bottom:80px}
@@ -119,11 +161,12 @@ input,select,textarea{width:100%;padding:10px;margin:5px 0;border-radius:5px;bor
 .progress-fill{height:100%;width:0%;background:white;animation:load 10s linear forwards}
 @keyframes load{0%{width:0%}100%{width:100%}}
 .chat-msg{display:flex;margin:8px 0}.chat-msg.me{justify-content:flex-end}.chat-msg.other{justify-content:flex-start}
-.bubble{padding:10px 15px;border-radius:18px;max-width:70%}.me .bubble{background:#2196f3;color:white;border-bottom-right-radius:5px}
-.other .bubble{background:#e0e0e0;color:#333;border-bottom-left-radius:5px}body.dark .other .bubble{background:#333;color:#eee}
+.bubble{padding:10px 15px;border-radius:18px;max-width:70%}.me.bubble{background:#2196f3;color:white;border-bottom-right-radius:5px}
+.other.bubble{background:#e0e0e0;color:#333;border-bottom-left-radius:5px}body.dark.other.bubble{background:#333;color:#eee}
 .friend-card{display:flex;align-items:center;gap:10px;padding:12px;background:var(--card);border-radius:10px;margin:8px 0;text-decoration:none;color:var(--text)}
 .friend-avatar{width:45px;height:45px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-weight:bold}
 .notification{position:absolute;top:-5px;right:-5px;background:red;color:white;border-radius:50%;width:18px;height:18px;font-size:0.7rem;display:flex;align-items:center;justify-content:center}
+.readonly-box{width:100%;padding:12px;background:#eee;border:1px dashed #999;font-size:1.1rem;font-weight:bold;text-align:center;user-select:all}
 </style></head><body>{{header}}<div class="container">{{content}}</div><script>{{timer_script}}</script></body></html>"""
 
 def get_header(nickname,user, show_nav=True):
@@ -144,10 +187,11 @@ def splash():
 .progress-fill{height:100%;width:0%;background:white;animation:load 10s linear forwards}
 @keyframes load{0%{width:0%}100%{width:100%}}
 @keyframes glow{from{text-shadow:0 0 10px #fff}to{text-shadow:0 0 30px #2196f3}}
-.bulb{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:4rem;z-index:10}
+.bulb{position:absolute;top:35%;left:50%;transform:translate(-50%,-50%);font-size:4rem;z-index:10} /* MOVED UP */
 </style></head><body>
 <div class="bulb">📖</div>
 <div class="logo">MOTIZ E-LEARNING INSTITUTION</div><div class="subtext">Learn. Practice. Excel.</div><div class="progress-bar"><div class="progress-fill"></div></div></body></html>""")
+
 @app.route('/register', methods=["GET","POST"])
 def register():
     if get_user()[1]: return redirect("/main")
@@ -181,7 +225,6 @@ def login():
             if u and u["password"] == pwd: session["nickname"] = nickname; return redirect("/main")
             else: error = "<div class=error>Invalid Nickname or Password</div>"
     return render_template_string(BASE, title="Login", header="", content=Markup(f"<div class='card'><h2>Login</h2>{error}<form method=POST><input name=nickname placeholder='Nickname' required><input type=password name=password placeholder=Password required><button class=btn>Login</button><a class=btn.blue href=/register>Register</a></form></div>"), timer_script="")
-
 @app.route('/main')
 @login_required
 def main(nickname, user):
@@ -252,6 +295,7 @@ def result(nickname, user):
     percent = round((correct/total)*100, 1) if total>0 else 0; grade = "A" if percent>=70 else "B" if percent>=60 else "C" if percent>=50 else "F"
     session.pop(session_key, None); session.pop(answers_key, None)
     return render_template_string(BASE, title="Result", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class='card'><h2>🎉 Your Result</h2><p><b>Score:</b> {correct}/{total}</p><p><b>Percentage:</b> {percent}%</p><p><b>Grade:</b> {grade}</p></div>{result_html}<a class=btn href=/exam>Start New Exam</a>"), timer_script="")
+
 @app.route('/request-payment/<t>')
 @login_required
 def req_pay(nickname, user, t):
@@ -259,10 +303,9 @@ def req_pay(nickname, user, t):
     with DBSession() as db: pending = db.execute(sa.text("SELECT * FROM payments WHERE nickname=:u AND type=:t AND status='Pending'"), {"u": nickname, "t": t}).scalar()
     if pending: return render_template_string(BASE, title="Payment", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>⏳ Request Pending</h2><p>Wait for admin to verify</p></div>"), timer_script="")
 
-    # FIXED COPY BUTTON WITH FALLBACK
-    copy_js = Markup("""<script>function copyAcc(){let acc = '8908025244'; navigator.clipboard.writeText(acc).then(()=>{alert('Account number copied!')}).catch(()=>{let ta=document.createElement('textarea');ta.value=acc;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('Copied! If it failed, long press to copy: '+acc)})}</script>""")
-    form = f'<div class=card><h2>Pay &#8358;{price} to unlock</h2><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account:</b> {PALMPAY_ACCOUNT} <button type=button class=btn.gray onclick=copyAcc()>Copy</button><br><b>Name:</b> {PALMPAY_NAME}</p><p style=color:orange;font-weight:bold>ADMIN WILL VERIFY WITHIN 24HRS</p><form method=POST action=/confirm/{t}><input name=bank_used placeholder="Bank you used to transfer" required><input name=account_name placeholder="Account Name you used" required><button class=btn>I Have Paid</button></form></div>'
-    return render_template_string(BASE, title="Payment", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(form), timer_script=copy_js)
+    # FIXED: NO COPY BUTTON. READONLY BOX INSTEAD FOR EASY COPY
+    form = f'<div class=card><h2>Pay &#8358;{price} to unlock</h2><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account Number:</b><input class=readonly-box readonly value="{PALMPAY_ACCOUNT}"><br><b>Account Name:</b> {PALMPAY_NAME}</p><p style=color:orange;font-weight:bold>ADMIN WILL VERIFY WITHIN 24HRS</p><form method=POST action=/confirm/{t}><input name=bank_used placeholder="Bank you used to transfer" required><input name=account_name placeholder="Account Name you used" required><button class=btn>I Have Paid</button></form></div>'
+    return render_template_string(BASE, title="Payment", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(form), timer_script="")
 
 @app.route('/confirm/<t>', methods=["POST"])
 @login_required
@@ -278,14 +321,13 @@ def lessons(nickname, user):
     if expired: return redirect("/request-payment/lessons")
     access_banner = f"<div class=success>✅ Access Active till {user['lesson_expiry']}</div>"
 
-    # FIXED: NOW WORKS FOR JSS WITH EMPTY DEPT
+    # FIXED: SHOW ALL LESSONS FOR THE CLASS - NO DEPT FILTER
     with DBSession() as db:
-        lessons = db.execute(sa.text("SELECT * FROM lessons WHERE class=:c AND (dept=:d OR dept='' OR dept IS NULL)"), {"c": user['class'], "d": user.get('dept','')}).mappings().all()
+        lessons = db.execute(sa.text("SELECT * FROM lessons WHERE class=:c ORDER BY id DESC"), {"c": user['class']}).mappings().all()
 
     lessons_html = "".join([f"<div class=card><h3>📖 {l['subject']} - {l['title']}</h3><p>{l['notes']}</p><small>Posted: {l['date']}</small></div>" for l in lessons])
     if not lessons_html: lessons_html = "<p>No lessons for your class yet</p>"
     return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>My Lessons</h2>{access_banner}</div>{lessons_html}"), timer_script="")
-
 @app.route('/community', methods=["GET","POST"])
 @login_required
 def community(nickname, user):
@@ -295,7 +337,7 @@ def community(nickname, user):
             elif "delete_post" in request.form:
                 pid = request.form["delete_post"]
                 owner = db.execute(sa.text("SELECT nickname FROM posts WHERE id=:id"), {"id": pid}).scalar()
-                if owner == nickname: db.execute(sa.text("DELETE FROM posts WHERE id=:id"), {"id": pid}) # Only owner can delete
+                if owner == nickname: db.execute(sa.text("DELETE FROM posts WHERE id=:id"), {"id": pid})
             elif "comment_post_id" in request.form:
                 p = db.execute(sa.text("SELECT comments FROM posts WHERE id=:id"), {"id": request.form["comment_post_id"]}).scalar(); comments = json.loads(p); comments.append({"user": user["name"], "text": request.form["comment_text"]})
                 db.execute(sa.text("UPDATE posts SET comments=:c WHERE id=:id"), {"c": json.dumps(comments), "id": request.form["comment_post_id"]})
@@ -350,18 +392,25 @@ def dm_chat(nickname, user, to_nickname):
     if to_nickname not in user['friends']: return redirect("/dm")
     with DBSession() as db:
         if request.method=="POST":
+            # FIXED BAD REQUEST: escape quotes + always set read_by as JSON
+            msg_text = request.form["msg"].replace("'", "''")
             db.execute(sa.text("INSERT INTO dms (from_nickname, to_nickname, text, time, read_by) VALUES (:f, :t, :txt, :time, :r)"),
-                       {"f": nickname, "t": to_nickname, "txt": request.form["msg"], "time": datetime.now(NIGERIA_TZ).strftime("%H:%M"), "r": json.dumps([nickname])})
+                       {"f": nickname, "t": to_nickname, "txt": msg_text, "time": datetime.now(NIGERIA_TZ).strftime("%H:%M"), "r": json.dumps([nickname])})
             db.commit(); return redirect(f"/dm/{to_nickname}")
+
         chat = db.execute(sa.text("SELECT * FROM dms WHERE (from_nickname=:u AND to_nickname=:t) OR (from_nickname=:t AND to_nickname=:u) ORDER BY id"),{"u": nickname, "t": to_nickname}).mappings().all()
+
+        # FIXED: Mark as read safely for old messages
         for m in chat:
             if m['to_nickname'] == nickname:
-                read_list = json.loads(m.get('read_by','[]')) # FIXED:.get to prevent crash
+                try: read_list = json.loads(m.get('read_by','[]'))
+                except: read_list = []
                 if nickname not in read_list:
                     read_list.append(nickname)
                     db.execute(sa.text("UPDATE dms SET read_by=:r WHERE id=:id"), {"r": json.dumps(read_list), "id": m['id']})
         db.commit()
         to_name = db.execute(sa.text("SELECT name FROM users WHERE nickname=:u"), {"u": to_nickname}).scalar()
+
     msgs = "".join([f"<div class='chat-msg {'me' if m['from_nickname']==nickname else 'other'}'><div class=bubble><b>{m['from_nickname']}:</b> {m['text']} <small>{m['time']}</small></div></div>" for m in chat])
     content = f"<div class=card><div class=chat-box>{msgs or '<p style=text-align:center;color:gray>No messages yet</p>'}</div><form method=POST><input name=msg placeholder='Type message...' required style=width:100%><button class=btn.gray style=margin-top:8px>Send</button></form></div>"
     return render_template_string(BASE, title=f"Chat with {to_name}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
@@ -435,7 +484,7 @@ def profile(nickname, user):
 @app.route('/admin', methods=["GET","POST"])
 @login_required
 def admin(nickname, user):
-    global ADMIN_PASS
+    global ADMIN_PASS, NOTICES
     if not session.get("admin_logged_in"):
         error = ""
         if request.method=="POST" and "login_pass" in request.form:
@@ -461,16 +510,16 @@ def admin(nickname, user):
             if "add_question" in request.form:
                 cls = request.form['admin_class']; dept = request.form.get('admin_dept',''); sub = request.form['admin_subject']; key = f"{cls}_{dept}_{sub}" if dept else f"{cls}_{sub}"
                 options = [request.form["a"],request.form["b"],request.form["c"],request.form["d"]]
-                correct_ans = options[ord(request.form["correct_ans"]) - ord('A')] # Convert A/B/C/D to actual text
+                correct_ans = options[int(request.form["correct_ans"])]
                 db.execute(sa.text("INSERT INTO questions (key, q, options, ans) VALUES (:k, :q, :o, :a)"),{"k": key, "q": request.form["q"], "o": json.dumps(options), "a": correct_ans}); db.commit(); error = f"<div class=success>Question Added for {sub}</div>"
             if "new_notice" in request.form:
                 notice = {"title": request.form["notice_title"], "text": request.form["new_notice"], "created_at": str(datetime.now(NIGERIA_TZ))}
-                NOTICES.append(notice); set_setting("notices", json.dumps(NOTICES)); error = "<div class=success>Notice Posted</div>"
+                NOTICES.append(notice); set_setting("notices", json.dumps(NOTICES)); NOTICES = json.loads(get_setting("notices", "[]")); error = "<div class=success>Notice Posted</div>"
             if "delete_notice" in request.form:
                 idx = int(request.form["delete_notice"])
-                if 0 <= idx < len(NOTICES): del NOTICES[idx]; set_setting("notices", json.dumps(NOTICES)); error = "<div class=success>Notice Deleted</div>"
+                if 0 <= idx < len(NOTICES): del NOTICES[idx]; set_setting("notices", json.dumps(NOTICES)); NOTICES = json.loads(get_setting("notices", "[]")); error = "<div class=success>Notice Deleted</div>"
 
-    # ADMIN JS: 3-STEP FLOW FOR BOTH QUESTIONS AND LESSONS
+    # FIXED JS: 3-STEP FLOW FOR BOTH QUESTIONS AND LESSONS - WORKS FOR JSS TOO
     js = Markup(f"""<script>
 const subjects = {json.dumps(SUBJECTS)};
 function updateDept(){{
@@ -481,6 +530,7 @@ function updateDept(){{
     if(['SS1','SS2','SS3'].includes(c)){{
         dDiv.innerHTML = '<label>Step 2: Select Department</label><select name=admin_dept id=admin_dept onchange=loadSubjects() required><option value="">Select Dept</option><option>Science</option><option>Commercial</option><option>Art</option></select>';
     }} else {{
+        dDiv.innerHTML = '<input type=hidden name=admin_dept value="">'; // FOR JSS
         loadSubjects();
     }}
 }}
@@ -500,6 +550,7 @@ function updateLessonDept(){{
     if(['SS1','SS2','SS3'].includes(c)){{
         dDiv.innerHTML = '<label>Step 2: Select Department</label><select name=lesson_dept id=lesson_dept onchange=loadLessonSubjects() required><option value="">Select Dept</option><option>Science</option><option>Commercial</option><option>Art</option></select>';
     }} else {{
+        dDiv.innerHTML = '<input type=hidden name=lesson_dept value="">'; // FOR JSS
         loadLessonSubjects();
     }}
 }}
@@ -544,7 +595,7 @@ function loadLessonSubjects(){{
 <div id="admin_subject_div"></div>\
 <textarea name="q" placeholder="Question" required></textarea>\
 <input name="a" placeholder="Option A" required><input name="b" placeholder="Option B" required><input name="c" placeholder="Option C" required><input name="d" placeholder="Option D" required>\
-<label>Step 4: Select Correct Answer</label><select name=correct_ans required><option value=A>Option A</option><option value=B>Option B</option><option value=C>Option C</option><option value=D>Option D</option></select>\
+<label>Step 4: Select Correct Answer</label><select name=correct_ans required><option value=0>Option A</option><option value=1>Option B</option><option value=2>Option C</option><option value=3>Option D</option></select>\
 <button name="add_question" class="btn">Post Question</button></form></div>'
     return render_template_string(BASE, title="Admin", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(form), timer_script=js)
 
