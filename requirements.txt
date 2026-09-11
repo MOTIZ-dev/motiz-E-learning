@@ -1,6 +1,6 @@
 Flask==3.0.3
-SQLAlchemy==2.0.31
+SQLAlchemy==2.0.30
 psycopg2-binary==2.9.9
 pytz==2024.1
-markupsafe==2.1.5
 gunicorn==22.0.0
+MarkupSafe==2.1.5
