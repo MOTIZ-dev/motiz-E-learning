@@ -70,7 +70,6 @@ init_db()
 # ====== FIX OLD USERS WITH NULL VALUES + ADD MISSING COLUMNS ======
 def fix_old_users():
     with DBSession() as db:
-        # ADD COLUMNS IF THEY DON'T EXIST - FOR OLD DATABASES
         try: db.execute(sa.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS free_questions_used INTEGER DEFAULT 0"))
         except: pass
         try: db.execute(sa.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS q_used INTEGER DEFAULT 0"))
@@ -94,7 +93,6 @@ def fix_old_users():
         try: db.execute(sa.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS payment_verified_date TEXT"))
         except: pass
         
-        # NOW UPDATE NULLS - REMOVED THE '' CHECK
         db.execute(sa.text("UPDATE users SET free_questions_used = 0 WHERE free_questions_used IS NULL"))
         db.execute(sa.text("UPDATE users SET q_used = 0 WHERE q_used IS NULL"))
         db.execute(sa.text("UPDATE users SET correct = 0 WHERE correct IS NULL"))
@@ -102,7 +100,19 @@ def fix_old_users():
         db.commit()
 
 fix_old_users() # RUN ONCE ON STARTUP
-ADMIN_PASS = get_setting("admin_pass", ADMIN_PASS)
+
+# ====== HELPER FUNCTIONS MUST BE HERE ======
+def get_setting(key, default=""):
+    with DBSession() as db:
+        val = db.execute(sa.text("SELECT value FROM settings WHERE key=:k"), {"k": key}).scalar()
+        return val if val is not None else default
+
+def set_setting(key, value):
+    with DBSession() as db:
+        db.execute(sa.text("INSERT INTO settings (key, value) VALUES (:k, :v) ON CONFLICT (key) DO UPDATE SET value=:v"), {"k": key, "v": value})
+        db.commit()
+
+ADMIN_PASS = get_setting("admin_pass", ADMIN_PASS) # NOW THIS WILL WORK
 NOTICES = json.loads(get_setting("notices", json.dumps([{"title":"Welcome","text":"Welcome to MOTIZ E-LEARNING!","created_at": str(datetime.now(NIGERIA_TZ))}])))
 PINNED_NOTICE = get_setting("pinned_notice", "")
 def get_user():
