@@ -20,6 +20,7 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 engine = sa.create_engine(DATABASE_URL)
+DBSession = sessionmaker(bind=engine)  # <-- ADDED THIS LINE
 
 # ====== SETTINGS - FINAL LOCKED ======
 PALMPAY_ACCOUNT = "8908025244"
@@ -72,7 +73,7 @@ init_db()
 
 # ====== FIX OLD USERS WITH NULL VALUES + ADD MISSING COLUMNS ======
 def fix_old_users():
-    with DBSession() as db:
+    with DBSession() as db:  # <-- NOW DBSession EXISTS
         for col in ["free_questions_used","q_used","correct","wrong","lesson_expiry","friends","referred_by","referral_count","free_days","is_verified","payment_verified_date"]:
             try: db.execute(sa.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col}"))
             except: pass
