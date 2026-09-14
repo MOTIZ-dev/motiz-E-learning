@@ -11,12 +11,15 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', "motiz_secret_key_2026_v30")
 app.config['PROPAGATE_EXCEPTIONS'] = True
 
-# ====== RENDER DATABASE CONNECTION ======
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
     raise Exception("DATABASE_URL environment variable is not set")
+
+# FIX FOR RENDER POSTGRES
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 engine = sa.create_engine(DATABASE_URL)
-DBSession = sessionmaker(bind=engine)
 
 # ====== SETTINGS - FINAL LOCKED ======
 PALMPAY_ACCOUNT = "8908025244"
