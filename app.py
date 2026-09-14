@@ -735,10 +735,9 @@ def admin(nickname, user):
 <div class="card"><h2>📝 GROUP 1: CBT - ADD QUESTIONS</h2><div style="display:flex;flex-direction:column;gap:10px">{group1}</div></div>\
 <div class="card"><h2>🎓 GROUP 2: LESSONS - POST LESSONS</h2><div style="display:flex;flex-direction:column;gap:10px">{group2}</div></div>\
 <div class="card"><h2>⚙️ GROUP 3: MANAGE CONTENT</h2><a href=/admin?manage=questions class=btn.blue>Manage CBT Questions</a><a href=/admin?manage=lessons class=btn.blue>Manage Lessons</a><a href=/admin?manage=notices class=btn.blue>Manage Notices</a></div>\
-<div class="card"><h2>👥 GROUP 4: STUDENT MANAGEMENT</h2><h3>Confirm Payment</h3>{pending_html or "<p>No pending payments</p>"}<a href=/admin_attendance class=btn.blue>View Attendance</a><form method=POST><h3>Post Notice</h3><input name=notice_title placeholder="Notice Title" required><textarea name=notice_text placeholder="Notice Message" required></textarea><input name=media_link placeholder="Image/Video Imgur Link optional"><button name=post_notice class='send-img-btn'><img src="{SEND_BTN_URL}"></button></form></div>\
+<div class="card"><h2>👥 GROUP 4: STUDENT MANAGEMENT</h2><h3>Confirm Payment</h3>{pending_html or "<p>No pending payments</p>"}<a href=/admin_attendance class=btn.blue>View Attendance</a><form method=POST><h3>Post Notice</h3><input name=notice_title placeholder="Notice Title" required><textarea name=notice_text placeholder="Notice Message" required></textarea><input name=media_link placeholder="Image/Video Imgur Link optional"><button name=post_notice class="send-img-btn"><img src="{SEND_BTN_URL}"></button></form></div>\
 <div class="card"><h2>🛑 DANGER ZONE</h2><form method=POST onsubmit="return confirm(\'Delete ALL questions, lessons and payments?\')"><button name=clear_all_data class="btn red">Clear All Old Data</button></form></div>\
 <div class="card"><h2>🔒 GROUP 5: ADMIN SETTINGS</h2><h3>Change Admin Password</h3><form method="POST"><input type="password" name="old_pass" placeholder="Current Password" required><input type="password" name="new_pass" placeholder="New Password" required><button name="change_pass" class="btn orange">Change Password</button></form></div>'
-
     return render_template_string(BASE, title="Admin", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(form), timer_script="")
 
 @app.route('/admin_attendance')
