@@ -102,10 +102,15 @@ def delete_old_posts_and_notices():
     with DBSession() as db: db.execute(sa.text("DELETE FROM posts WHERE created_at < :c"), {"c": cutoff}); db.commit()
     new_notices = []
     for n in NOTICES:
-        try: notice_time = datetime.fromisoformat(n.get('created_at').replace('Z','+00:00'));
-             if notice_time > cutoff: new_notices.append(n)
-        except: new_notices.append(n)
-    if len(new_notices)!= len(NOTICES): NOTICES = new_notices; set_setting("notices", json.dumps(NOTICES))
+        try: 
+            notice_time = datetime.fromisoformat(n.get('created_at').replace('Z','+00:00'))
+            if notice_time > cutoff: 
+                new_notices.append(n)
+        except: 
+            new_notices.append(n)
+    if len(new_notices)!= len(NOTICES): 
+        NOTICES = new_notices
+        set_setting("notices", json.dumps(NOTICES))
 
 def login_required(f):
     @wraps(f)
