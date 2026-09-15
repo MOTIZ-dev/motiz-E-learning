@@ -73,17 +73,30 @@ init_db()
 
 # ====== FIX OLD USERS WITH NULL VALUES + ADD MISSING COLUMNS ======
 def fix_old_users():
-    with DBSession() as db:  # <-- NOW DBSession EXISTS
-        for col in ["free_questions_used","q_used","correct","wrong","lesson_expiry","friends","referred_by","referral_count","free_days","is_verified","payment_verified_date"]:
-            try: db.execute(sa.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col}"))
-            except: pass
-        try: db.execute(sa.text("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS media_link TEXT DEFAULT ''"))
-        except: pass
-        db.execute(sa.text("UPDATE users SET free_questions_used = 0 WHERE free_questions_used IS NULL"))
-        db.execute(sa.text("UPDATE users SET q_used = 0 WHERE q_used IS NULL"))
-        db.execute(sa.text("UPDATE users SET correct = 0 WHERE correct IS NULL"))
-        db.execute(sa.text("UPDATE users SET wrong = 0 WHERE wrong IS NULL"))
-        db.commit()
+    with DBSession() as db:
+        cols = ["free_questions_used","q_used","correct","wrong","lesson_expiry","friends","referred_by","referral_count","free_days","is_verified","payment_verified_date"]
+        for col in cols:
+            try: 
+                db.execute(sa.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} TEXT"))
+                db.commit()
+            except: 
+                db.rollback()
+        
+        try: 
+            db.execute(sa.text("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS media_link TEXT DEFAULT ''"))
+            db.commit()
+        except: 
+            db.rollback()
+
+        # Now do updates
+        try:
+            db.execute(sa.text("UPDATE users SET free_questions_used = COALESCE(free_questions_used, 0)"))
+            db.execute(sa.text("UPDATE users SET q_used = COALESCE(q_used, 0)"))
+            db.execute(sa.text("UPDATE users SET correct = COALESCE(correct, 0)"))
+            db.execute(sa.text("UPDATE users SET wrong = COALESCE(wrong, 0)"))
+            db.commit()
+        except:
+            db.rollback()
 
 fix_old_users()
 
