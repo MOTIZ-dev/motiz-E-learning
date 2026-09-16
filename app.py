@@ -1,7 +1,8 @@
 from flask import Flask, render_template_string, request, redirect, session
 from markupsafe import Markup
 from datetime import date, datetime, timedelta
-import random, json, os, urllib.parse
+import random, json, os, urllib.parse, csv, math
+from io import StringIO
 from functools import wraps
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
@@ -31,7 +32,8 @@ QUESTION_PRICE = 500
 ADMIN_PASS = os.environ.get('ADMIN_PASS', "24434")
 FREE_Q = 30
 PAID_Q = 70
-TIMER_PER_QUESTION = 60
+BATCH_SIZE = 10 # NEW: 10 QUESTIONS PER BATCH
+TIME_PER_BATCH = BATCH_SIZE * 90 # NEW: 15 MINUTES
 NIGERIA_TZ = pytz.timezone('Africa/Lagos')
 FAVICON_URL = "https://i.imgur.com/5TCBgkN.png"
 SEND_BTN_URL = "https://i.imgur.com/ADGwy5l.png"
@@ -75,38 +77,38 @@ def fix_old_users():
     with DBSession() as db:
         int_cols = ["free_questions_used","q_used","correct","wrong","referral_count","free_days"]
         text_cols = ["friends","referred_by","payment_verified_date"]
-        date_cols = ["lesson_expiry"] # FIXED: separate DATE
+        date_cols = ["lesson_expiry"]
         bool_cols = ["is_verified"]
-        
+
         for col in int_cols:
-            try: 
+            try:
                 db.execute(sa.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} INTEGER DEFAULT 0"))
                 db.commit()
-            except: 
+            except:
                 db.rollback()
         for col in text_cols:
-            try: 
+            try:
                 db.execute(sa.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} TEXT"))
                 db.commit()
-            except: 
+            except:
                 db.rollback()
-        for col in date_cols: # FIXED
-            try: 
+        for col in date_cols:
+            try:
                 db.execute(sa.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} DATE"))
                 db.commit()
-            except: 
+            except:
                 db.rollback()
         for col in bool_cols:
-            try: 
+            try:
                 db.execute(sa.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} BOOLEAN DEFAULT FALSE"))
                 db.commit()
-            except: 
+            except:
                 db.rollback()
-        
-        try: 
+
+        try:
             db.execute(sa.text("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS media_link TEXT DEFAULT ''"))
             db.commit()
-        except: 
+        except:
             db.rollback()
 
         try:
@@ -114,7 +116,7 @@ def fix_old_users():
             db.execute(sa.text("UPDATE users SET q_used = COALESCE(q_used, 0)"))
             db.execute(sa.text("UPDATE users SET correct = COALESCE(correct, 0)"))
             db.execute(sa.text("UPDATE users SET wrong = COALESCE(wrong, 0)"))
-            db.execute(sa.text("UPDATE users SET lesson_expiry = NULL WHERE lesson_expiry IS NULL")) # FIXED
+            db.execute(sa.text("UPDATE users SET lesson_expiry = NULL WHERE lesson_expiry IS NULL"))
             db.commit()
         except:
             db.rollback()
@@ -168,8 +170,7 @@ def login_required(f):
         delete_old_posts_and_notices()
         return f(nickname, user, *args, **kwargs)
     return wrapper
-
-# ====== BASE HTML - UPDATED: WHATSAPP BUBBLES + TIME DOWN ======
+# ====== BASE HTML - UPDATED: ADDED TIMER + OPTION CSS ======
 BASE = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="{FAVICON_URL}">
 <title>{{{{title}}}}</title><style>:root{{--bg:#f0f2f5;--card:white;--text:#333;--primary:#0f3460}} body.dark{{--bg:#121212;--card:#1e1e1e;--text:#eee}}
@@ -189,6 +190,10 @@ input,select,textarea{{width:100%;padding:10px;margin:5px 0;border-radius:5px;bo
 .success{{color:green;background:#d4edda;padding:10px;border-radius:5px}}.error{{color:red;background:#f8d7da;padding:10px;border-radius:5px}}
 .badge{{background:#28a745;color:white;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:5px}}
 .notice-title{{font-size:1.1rem;font-weight:bold;color:var(--primary);margin-bottom:5px}}
+.timer{{background:#e94560;color:white;padding:12px;text-align:center;border-radius:8px;font-weight:bold;font-size:1.1rem;margin-bottom:10px}}
+.option{{background:#f0f2f5;padding:14px;margin:10px 0;border-radius:8px;border:1px solid #ddd;color:black;display:flex;align-items:flex-start;gap:10px}}
+.option input{{margin-top:4px;flex-shrink:0;width:18px;height:18px}}
+.option span{{flex:1;line-height:1.4}}
 .chat-msg{{display:flex;margin:8px 0;align-items:flex-end;gap:8px}}.chat-msg.me{{justify-content:flex-end}}.chat-msg.other{{justify-content:flex-start}}
 .bubble{{display:flex;flex-direction:column;padding:10px 14px;border-radius:18px;max-width:70%;box-shadow:0 1px 1px rgba(0,0,0,0.1)}}
 .me.bubble{{background:#2196f3!important;color:white!important;border-bottom-right-radius:4px}}
@@ -285,14 +290,14 @@ def logout():
     session.clear()
     return redirect("/login")
 
-@app.route('/exam') # AUTO CLASS + 30 FREE THEN PAYMENT
+# ====== NEW CBT SYSTEM - 10 QUESTIONS BATCH ======
+@app.route('/exam')
 @login_required
 def exam(nickname, user):
     key = f"{user['class']}_{user['dept']}" if user['dept'] else user['class']
     subs = SUBJECTS.get(key, [])
     if not subs: return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=error>No subjects for your class yet</div>"), timer_script="")
 
-    # 1 MONTH LOCK LOGIC
     if user.get('payment_verified_date'):
         try:
             verified_date = datetime.strptime(user['payment_verified_date'], "%Y-%m-%d").date()
@@ -303,7 +308,6 @@ def exam(nickname, user):
                 user['is_verified'] = False
         except: pass
 
-    # 30 FREE QUESTIONS LOGIC - NO COUNTER SHOWN
     if not user.get('is_verified') and user['free_questions_used'] >= FREE_Q:
         with DBSession() as db: pending = db.execute(sa.text("SELECT * FROM payments WHERE nickname=:u AND type='questions' AND status='Pending'"), {"u": nickname}).scalar()
         if pending:
@@ -312,108 +316,87 @@ def exam(nickname, user):
             content = f'<div class=card><h2>🔒 Unlock 70 More Questions</h2><p>Continue practicing</p><p><b>Pay &#8358;{QUESTION_PRICE} to continue</b></p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account Number:</b><input class=readonly-box readonly value="{PALMPAY_ACCOUNT}"><br><b>Account Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/questions><input name=bank_used placeholder="Bank you used to transfer" required><input name=account_name placeholder="Account Name you used" required><button class="send-img-btn"><img src="{SEND_BTN_URL}"></button></form></div>'
         return render_template_string(BASE, title="CBT Payment", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
-    sub_btns = "".join([f"<a class='btn blue' href=/start/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}>📚 {s}</a>" for s in subs])
-    return render_template_string(BASE, title="CBT", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class='card'><h2>Subjects for {user['class']} {user.get('dept','')}</h2>{sub_btns}</div>"), timer_script="")
+    sub_btns = "".join([f"<a class='btn blue' href=/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}>📚 {s}</a>" for s in subs])
+    return render_template_string(BASE, title="CBT", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class='card'><h2>Subjects for {user['class']} {user.get('dept','')}</h2><p>10 Questions per attempt. 15 Minutes.</p>{sub_btns}</div>"), timer_script="")
 
-@app.route('/start/<path:key>/<path:sub>', methods=["GET","POST"])
+@app.route('/cbt/<path:key>/<path:sub>', methods=["GET","POST"])
 @login_required
-def start(nickname, user, key, sub):
+def cbt_exam(nickname, user, key, sub):
     key = urllib.parse.unquote(key); sub = urllib.parse.unquote(sub)
-    total_limit = FREE_Q + PAID_Q if user.get('is_verified') else FREE_Q
-    if not user.get('is_verified') and user['free_questions_used'] >= FREE_Q: return redirect("/exam")
-    if user.get('is_verified') and user['q_used'] >= total_limit: return redirect("/exam")
-
     full_key = f"{key}_{sub}"
-    with DBSession() as db: q_list = db.execute(sa.text("SELECT * FROM questions WHERE key=:k"), {"k": full_key}).mappings().all()
 
-    # CBT CRASH FIX + POPUP
-    if len(q_list) == 0:
-        return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card style='text-align:center'><h2>😕 No Questions Yet</h2><p>No questions found for <b>{sub}</b></p><p>Please contact Admin to upload questions for this subject.</p><a class=btn.blue href=/exam>Back to Subjects</a></div>"), timer_script="")
+    total_limit = FREE_Q + PAID_Q if user.get('is_verified') else FREE_Q
 
-    session_key = f"exam_{full_key}"; answers_key = f"answers_{full_key}"
-    try:
-        if request.method == "GET":
-            questions = list(q_list); random.shuffle(questions)
-            for q in questions: q['options'] = json.loads(q['options']) # TEST JSON HERE TO CATCH BAD DATA
-            session[session_key] = questions[:total_limit]; session[answers_key] = {}; session['q_index'] = 0
-    except Exception as e:
-        return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card style='text-align:center;border:2px solid red'><h2>⚠️ CBT Error</h2><p>Admin uploaded bad question data for <b>{sub}</b></p><p>Error: {str(e)}</p><a class=btn.blue href=/exam>Back to Subjects</a></div>"), timer_script="")
+    with DBSession() as db:
+        all_q = db.execute(sa.text("SELECT * FROM questions WHERE key=:k ORDER BY id ASC"), {"k": full_key}).mappings().all()
+        if len(all_q) == 0:
+            return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>😕 No Questions Yet for {sub}</h2><a class=btn.blue href=/exam>Back</a></div>"), timer_script="")
 
-    questions = session.get(session_key, []); answers = session.get(answers_key, {}); q_index = session.get('q_index', 0)
+    done_count = user['q_used']
+
+    if done_count >= total_limit or done_count >= len(all_q):
+        return render_template_string(BASE, title="Done", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>✅ You have completed all {min(total_limit, len(all_q))} questions for {sub}</h2><p>Score: {user['correct']} Correct, {user['wrong']} Wrong</p><a class=btn href=/exam>Back</a></div>"), timer_script="")
+
+    start_index = done_count
+    end_index = min(start_index + BATCH_SIZE, total_limit, len(all_q))
+    batch_q = all_q[start_index:end_index]
+
+    if len(batch_q) == 0:
+        return render_template_string(BASE, title="Done", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>✅ You have completed all questions for {sub}</h2><a class=btn href=/exam>Back</a></div>"), timer_script="")
+
+    questions = [dict(q) for q in batch_q]
+    for q in questions: q['options'] = json.loads(q['options'])
 
     if request.method == "POST":
-        if "save_answer" in request.form and request.form.get("answer"):
-            session[answers_key][str(q_index)] = request.form.get("answer"); session.modified = True
-        if "next" in request.form:
-            if str(q_index) not in answers: session[answers_key][str(q_index)] = "SKIPPED"
-            session['q_index'] = q_index + 1
-        if "prev" in request.form: session['q_index'] = q_index - 1
-        if "submit_exam" in request.form: return redirect("/result")
-        if "timeout" in request.form:
-            if str(q_index) not in answers: session[answers_key][str(q_index)] = "TIMEOUT"
-            session.modified = True
-            session['q_index'] = q_index + 1
-        return redirect(f"/start/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}")
+        score = 0; result_html = "";
+        batch_number = math.floor(done_count / BATCH_SIZE) + 1
 
-    if q_index >= len(questions): return redirect("/result")
-    q = questions[q_index]; saved_ans = answers.get(str(q_index))
+        for i,q in enumerate(questions):
+            user_ans = request.form.get(f"q{i}")
+            if user_ans == q["ans"]: score += 1
+            result_html += f"<div class='card'><h4>Q{start_index + i + 1}: {q['q']}</h4><p><b>Your Answer:</b> {user_ans or 'Not Answered'}</p><p><b>Correct Answer:</b> {q['ans']}</p></div>"
 
-    timer_js = Markup(f"""let timeLeft = {TIMER_PER_QUESTION};
-    const qKey = '{full_key}_{q_index}';
+        total = len(questions); wrong = total - score; percent = round((score/total)*100,1)
+        grade = "A" if percent>=70 else "B" if percent>=60 else "C" if percent>=50 else "F"
+
+        new_done_count = done_count + total # FIXED: use this for display
+        with DBSession() as db:
+            if not user.get('is_verified'):
+                db.execute(sa.text("UPDATE users SET free_questions_used=free_questions_used+:t, q_used=q_used+:t, correct=correct+:c, wrong=wrong+:w WHERE nickname=:u"), {"t": total, "c": score, "w": wrong, "u": nickname})
+            else:
+                db.execute(sa.text("UPDATE users SET q_used=q_used+:t, correct=correct+:c, wrong=wrong+:w WHERE nickname=:u"), {"t": total, "c": score, "w": wrong, "u": nickname})
+            db.commit()
+
+        remaining = min(total_limit, len(all_q)) - new_done_count
+        next_btn = f"<a class=btn href=/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}>Start Next 10 Questions - Batch {batch_number + 1}</a>" if remaining > 0 else ""
+
+        content = f"<div class='card'><h2>🎉 BATCH {batch_number} RESULT</h2><p><b>Score: {score}/{total}</b></p><p><b>Grade: {grade}</b></p><p><b>Questions Completed: {new_done_count}/{min(total_limit, len(all_q))}</b></p></div>{result_html}{next_btn}<a class=btn.blue href=/exam>Back to Subjects</a>" # FIXED
+        return render_template_string(BASE, title="Result", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
+
+    q_html = ""
+    batch_number = math.floor(done_count / BATCH_SIZE) + 1
+    global_start = start_index + 1
+    for i,q in enumerate(questions):
+        global_q_num = global_start + i
+        options = "".join([f"<label class=option><input type=radio name=q{i} value=\"{opt}\" required><span>{opt}</span></label>" for opt in q["options"]])
+        q_html += f"<div class=card id=q{i}><p><b>Question {global_q_num}</b></p><p>{q['q']}</p>{options}</div>"
+
+    timer_js = Markup(f"""
+    let timeLeft = {TIME_PER_BATCH};
     const timerEl = document.createElement('div');
-    timerEl.style.cssText='position:fixed;top:60px;right:10px;background:#ff9800;color:white;padding:8px 12px;border-radius:8px;font-weight:bold;z-index:1001';
-    document.body.appendChild(timerEl);
-    let submitted = false;
-    let savedTime = localStorage.getItem(qKey);
-    if(savedTime && parseInt(savedTime) > 0){{ timeLeft = parseInt(savedTime); }}
+    timerEl.className = 'timer';
+    document.querySelector('.container').prepend(timerEl);
     function updateTimer(){{
-        if(timeLeft < 0) timeLeft = 0;
-        localStorage.setItem(qKey, timeLeft);
         let m = Math.floor(timeLeft / 60); let s = timeLeft % 60; s = s < 10? '0' + s : s;
-        timerEl.innerHTML = '⏰ ' + m + ':' + s;
-        if(timeLeft <= 0 &&!submitted){{
-            submitted = true; localStorage.removeItem(qKey);
-            let form = document.getElementById('exam_form');
-            let input = document.createElement('input'); input.type = 'hidden'; input.name = 'save_answer'; input.value = '1';
-            form.appendChild(input); form.submit();
-            setTimeout(()=>{{if(!submitted){{document.getElementById('timeout_form').submit();}}}}, 200);
-        }}
+        timerEl.innerHTML = '⏰ BATCH {batch_number} TIME LEFT: ' + m + ':' + s;
+        if(timeLeft <= 0){{ document.getElementById('cbt_form').submit(); }}
         timeLeft--;
     }}
-    updateTimer(); let timerInterval = setInterval(updateTimer, 1000);
-    document.getElementById('exam_form').addEventListener('submit', ()=>{{localStorage.removeItem(qKey); clearInterval(timerInterval);}});""")
+    updateTimer(); setInterval(updateTimer, 1000);
+    """)
 
-    options_html = "".join([f"<label style='display:block;padding:10px;margin:8px 0;background:var(--bg);border-radius:8px'><input type=radio name=answer value='{opt}' {'checked' if saved_ans==opt else ''}> {opt}</label>" for opt in q['options']])
-    prev_btn = f"<button name=prev class='btn gray' {'disabled' if q_index==0 else ''}>⬅️ Prev</button>" if q_index > 0 else ""
-    next_btn = f"<button name=next class='btn blue'>Next ➡️</button>" if q_index < len(questions)-1 else f"<button name=submit_exam class='btn orange'>Submit Exam</button>"
-
-    content = f"<div class='card'><h2>{sub}</h2><h3>Question {q_index+1} of {len(questions)}</h3><p><b>{q['q']}</b></p>\
-    <form method=POST id=exam_form>{options_html}<div style='display:flex;gap:10px'>{prev_btn}{next_btn}</div></form>\
-    <form method=POST id=timeout_form style=display:none><input type=hidden name=timeout value=1></form></div>"
-
-    return render_template_string(BASE, title=sub, header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
-@app.route('/result')
-@login_required
-def result(nickname, user):
-    try: session_key = [k for k in session.keys() if k.startswith('exam_')][0]; answers_key = [k for k in session.keys() if k.startswith('answers_')][0]
-    except: return redirect("/exam")
-    questions = session.get(session_key, []); answers = session.get(answers_key, {}); correct = 0; result_html = ""
-    for i, q in enumerate(questions):
-        q['options'] = json.loads(q['options']) # FIXED
-        user_ans = answers.get(str(i))
-        if user_ans == q['ans']: correct += 1
-        result_html += f"<div class='card'><h4>Q{i+1}: {q['q']}</h4><p><b>Your Answer:</b> {user_ans or 'Not Answered'}</p><p><b>Correct Answer:</b> {q['ans']}</p></div>"
-    total = len(questions); wrong = total - correct
-    with DBSession() as db:
-        if user.get('is_verified'):
-            db.execute(sa.text("UPDATE users SET q_used=q_used+:t, correct=correct+:c, wrong=wrong+:w WHERE nickname=:u"), {"t": total, "c": correct, "w": wrong, "u": nickname})
-        else:
-            db.execute(sa.text("UPDATE users SET free_questions_used=free_questions_used+:t, q_used=q_used+:t, correct=correct+:c, wrong=wrong+:w WHERE nickname=:u"), {"t": total, "c": correct, "w": wrong, "u": nickname})
-        db.commit()
-    percent = round((correct/total)*100, 1) if total>0 else 0; grade = "A" if percent>=70 else "B" if percent>=60 else "C" if percent>=50 else "F"
-    session.pop(session_key, None); session.pop(answers_key, None)
-    return render_template_string(BASE, title="Result", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class='card'><h2>🎉 Your Result</h2><p><b>Score:</b> {correct}/{total}</p><p><b>Percentage:</b> {percent}%</p><p><b>Grade:</b> {grade}</p></div>{result_html}<a class=btn href=/exam>Start New Exam</a>"), timer_script="")
-
+    content = f"<form method=POST id=cbt_form><h2 style=color:white;text-align:center>{sub} - BATCH {batch_number}</h2><p style=color:white;text-align:center>Questions {global_start} to {end_index}</p>{q_html}<button class='btn orange'>Submit Batch {batch_number}</button></form>"
+    return render_template_string(BASE, title=f"{sub} Batch {batch_number}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
 @app.route('/confirm/<t>', methods=["POST"])
 @login_required
 def confirm(nickname, user, t):
@@ -485,7 +468,7 @@ def community(nickname, user):
         posts_html += f"<div class=card><b>{p['name']}</b>: {p['text']} {delete_btn}<form method=POST><input type=hidden name=like_post_id value={p['id']}><button class=btn.gray>🩷 {likes_count}</button></form>{comments_html}<form method=POST style='display:flex;gap:5px'><input type=hidden name=comment_post_id value={p['id']}><input name=comment_text placeholder='Write comment...' required maxlength=700 style='flex:1'><button class='send-img-btn'><img src='{SEND_BTN_URL}'></button></form></div>"
     return render_template_string(BASE, title="Community", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>Community</h2><form method=POST><textarea name=post placeholder='Whats on your mind?' required maxlength=1000></textarea><button class='send-img-btn'><img src='{SEND_BTN_URL}'></button><input type=hidden name=new_post value=1></form></div>{posts_html}"), timer_script="")
 
-@app.route('/me') # PROFILE + CBT STATS + FRIENDS + REFERRAL + LOGOUT - REMOVED Q COUNTER
+@app.route('/me')
 @login_required
 def me(nickname, user):
     with DBSession() as db:
@@ -496,14 +479,14 @@ def me(nickname, user):
     friends_html = "".join([f"<div class=card>👤 {f}</div>" for f in user['friends']]) or "<p>No friends yet</p>"
     all_users_html = "".join([f"<div class=card><b>{u['name']}</b><form method=POST action=/friends><input type=hidden name=send_request value={u['nickname']}><button class=btn.blue>Add Friend</button></form></div>" for u in all_users if u['nickname'] not in user['friends']])
 
-    stats = f"<div class=card><h3>📊 CBT Stats</h3><p><b>Correct:</b> {user['correct']}</p><p><b>Wrong:</b> {user['wrong']}</p><p><b>Lesson Expiry:</b> {user['lesson_expiry']}</p></div>" # REMOVED Q USED
+    stats = f"<div class=card><h3>📊 CBT Stats</h3><p><b>Correct:</b> {user['correct']}</p><p><b>Wrong:</b> {user['wrong']}</p><p><b>Lesson Expiry:</b> {user['lesson_expiry']}</p></div>"
     ref_link = f"{BASE_URL}/register?ref={nickname}"
     referral_card = f"""<div class=card><h2>🔗 Referral Program</h2><p>Share your link. When they pay, you get +5 days FREE Lessons + CBT</p><input class=readonly-box readonly value="{ref_link}" onclick="this.select()"><p><b>Friends Referred:</b> {user.get('referral_count',0)}</p><p><b>Free Days Earned:</b> {user.get('free_days',0)}</p></div>"""
 
     content = f"<div class=card><h2>My Profile</h2><p><b>Name:</b> {user['name']}</p><p><b>Nickname:</b> @{user['nickname']}</p><p><b>Class:</b> {user['class']} {user.get('dept','')}</p></div>{stats}{referral_card}<div class=card><h2>Friend Requests</h2>{incoming_html or '<p>No requests</p>'}</div><div class=card><h2>My Friends</h2>{friends_html}</div><div class=card><h2>Add Friend</h2>{all_users_html}</div><a class='btn red' href=/logout>🚪 Logout</a>"
     return render_template_string(BASE, title="Me", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
-@app.route('/chat') # DM + GROUPS
+@app.route('/chat')
 @login_required
 def chat(nickname, user):
     with DBSession() as db:
@@ -566,7 +549,6 @@ def dm_chat(nickname, user, to_nickname):
         db.commit()
         to_name = db.execute(sa.text("SELECT name FROM users WHERE nickname=:u"), {"u": to_nickname}).scalar()
 
-    # WHATSAPP BUBBLES WITH TIME DOWN
     msgs = ""
     for m in chat:
         initial = m['from_nickname'][0].upper()
@@ -578,7 +560,6 @@ def dm_chat(nickname, user, to_nickname):
 
     content = f"<div class=card><div class=chat-box>{msgs or '<p style=text-align:center;color:gray>No messages yet</p>'}</div></div><form method=POST class=chat-input-fixed><input name=msg placeholder='Type message...' required maxlength=700 style='flex:1'><button class='send-img-btn'><img src='{SEND_BTN_URL}'></button></form>"
     return render_template_string(BASE, title=f"Chat with {to_name}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
-
 @app.route('/groups', methods=["GET","POST"])
 @login_required
 def groups(nickname, user):
@@ -636,6 +617,7 @@ def group_chat(nickname, user, gid):
 
     content = f"{member_manage}<div class=card><h2>{group['name']}</h2></div><div class=card><div class=chat-box>{msgs or '<p>No messages yet</p>'}</div></div><form method=POST class=chat-input-fixed><input name=msg placeholder='Type message...' required maxlength=700 style='flex:1'><button name=send_msg class='send-img-btn'><img src='{SEND_BTN_URL}'></button></form>"
     return render_template_string(BASE, title=group['name'], header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
+
 @app.route('/admin', methods=["GET","POST"])
 @login_required
 def admin(nickname, user):
@@ -654,11 +636,11 @@ def admin(nickname, user):
 
     if request.method=="POST":
         with DBSession() as db:
-            # VERIFY PAYMENT + SET 1 MONTH + VERIFY STUDENT
+            # FIXED: NOW SETS is_verified=TRUE FOR QUESTIONS TOO
             if "verify_id" in request.form:
                 req = db.execute(sa.text("SELECT * FROM payments WHERE id=:id"), {"id": request.form["verify_id"]}).mappings().first()
                 if req["type"] == "questions":
-                    db.execute(sa.text("UPDATE users SET q_cycle='paid' WHERE nickname=:u"), {"u": req["nickname"]})
+                    db.execute(sa.text("UPDATE users SET q_cycle='paid', is_verified=TRUE, payment_verified_date=:today WHERE nickname=:u"), {"today": str(date.today()), "u": req["nickname"]})
                 if req["type"] == "lessons":
                     db.execute(sa.text("UPDATE users SET lesson_expiry=:d, is_verified=TRUE, payment_verified_date=:today WHERE nickname=:u"), {"d": str(date.today() + timedelta(days=15)), "today": str(date.today()), "u": req["nickname"]})
                 ref = db.execute(sa.text("SELECT referred_by FROM users WHERE nickname=:u"), {"u": req["nickname"]}).scalar()
@@ -671,23 +653,23 @@ def admin(nickname, user):
             if "deny_id" in request.form:
                 db.execute(sa.text("UPDATE payments SET status='Denied' WHERE id=:id"), {"id": request.form["deny_id"]}); db.commit(); error = "<div class=error>Payment Denied</div>"
 
-            # ADD SINGLE QUESTION
             if "add_question" in request.form:
                 key = f"{request.form['q_key']}_{request.form['admin_subject']}"
                 options = [request.form["a"],request.form["b"],request.form["c"],request.form["d"]]
                 correct_ans = options[int(request.form["correct_ans"])]
                 db.execute(sa.text("INSERT INTO questions (key, q, options, ans) VALUES (:k, :q, :o, :a)"),{"k": key, "q": request.form["q"], "o": json.dumps(options), "a": correct_ans}); db.commit(); error = f"<div class=success>Question Added for {key}</div>"
 
-            # BULK UPLOAD
+            # FIXED BULK UPLOAD: USES CSV READER
             if "bulk_upload" in request.form:
                 key = f"{request.form['bulk_key']}_{request.form['bulk_subject']}"
-                data = request.form['bulk_data'].strip().split('\n')
+                data = request.form['bulk_data'].strip()
+                f = StringIO(data)
+                reader = csv.reader(f)
                 success = 0; failed = []
-                for i, line in enumerate(data, 1):
+                for i, parts in enumerate(reader, 1):
                     try:
-                        parts = [x.strip() for x in line.split(',')]
-                        if len(parts)!= 6: raise Exception("Need 6 columns")
-                        q, a, b, c, d, ans = parts
+                        if len(parts)!= 6: raise Exception("Need 6 columns: Question,A,B,C,D,CorrectAnswer")
+                        q, a, b, c, d, ans = [x.strip() for x in parts]
                         options = [a,b,c,d]
                         db.execute(sa.text("INSERT INTO questions (key, q, options, ans) VALUES (:k, :q, :o, :a)"),{"k": key, "q": q, "o": json.dumps(options), "a": ans})
                         success += 1
@@ -697,7 +679,6 @@ def admin(nickname, user):
                 bulk_result = f"<div class=success>✅ {success} Questions Added</div>"
                 if failed: bulk_result += f"<div class=error>❌ Failed: {' | '.join(failed)}</div>"
 
-            # ADD LESSON
             if "add_lesson" in request.form:
                 full_key = request.form['l_key']
                 parts = full_key.split("_")
@@ -706,7 +687,6 @@ def admin(nickname, user):
                 db.execute(sa.text("INSERT INTO lessons (class, dept, subject, title, notes, date, media_link) VALUES (:c, :d, :s, :t, :n, :date, :m)"),
                            {"c": cls, "d": dept, "s": request.form['lesson_subject'], "t": request.form['lesson_title'], "n": request.form['lesson_notes'], "date": str(date.today()), "m": request.form.get('media_link','')}); db.commit(); error = "<div class=success>Lesson Posted</div>"
 
-            # EDIT/DELETE
             if "edit_question" in request.form:
                 options = [request.form["a"],request.form["b"],request.form["c"],request.form["d"]]
                 correct_ans = options[int(request.form["correct_ans"])]
@@ -750,7 +730,7 @@ def admin(nickname, user):
         sub_options = "".join([f"<option>{s}</option>" for s in subs])
         add_q_form = f"<div class=card><h3>Add Question for {q_target.replace('_',' ')}</h3><form method=POST><input type=hidden name=q_key value='{q_target}'><select name=admin_subject required><option value=''>Select Subject</option>{sub_options}</select><textarea name=q placeholder='Question' required></textarea><input name=a placeholder='Option A' required><input name=b placeholder='Option B' required><input name=c placeholder='Option C' required><input name=d placeholder='Option D' required><select name=correct_ans required><option value=0>A</option><option value=1>B</option><option value=2>C</option><option value=3>D</option></select><button name=add_question class='send-img-btn'><img src='{SEND_BTN_URL}'></button></form></div>"
         if request.args.get('bulk'):
-            bulk_form = f"<div class=card><h3>📦 Bulk Upload for {q_target.replace('_',' ')}</h3>{bulk_result}<form method=POST><input type=hidden name=bulk_key value='{q_target}'><select name=bulk_subject required><option value=''>Select Subject</option>{sub_options}</select><textarea name=bulk_data placeholder='Paste CSV: Question,A,B,C,D,CorrectAnswer\nWhat is 2+2?,2,3,4,5,4' rows=10 required></textarea><button name=bulk_upload class=btn.orange>Upload 20/50 Questions</button></form></div>"
+            bulk_form = f"<div class=card><h3>📦 Bulk Upload for {q_target.replace('_',' ')}</h3>{bulk_result}<form method=POST><input type=hidden name=bulk_key value='{q_target}'><select name=bulk_subject required><option value=''>Select Subject</option>{sub_options}</select><textarea name=bulk_data placeholder='Paste CSV: Question,A,B,C,D,CorrectAnswer' rows=10 required></textarea><button name=bulk_upload class=btn.orange>Upload 20/50 Questions</button></form></div>"
 
     add_l_form = ""
     if l_target:
