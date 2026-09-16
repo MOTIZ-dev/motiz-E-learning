@@ -324,6 +324,11 @@ def exam(nickname, user):
 def cbt_exam(nickname, user, key, sub):
     key = urllib.parse.unquote(key); sub = urllib.parse.unquote(sub)
     full_key = f"{key}_{sub}"
+    
+    # CREATE PROGRESS TABLE IF NOT EXISTS
+    with DBSession() as db:
+        db.execute(sa.text("CREATE TABLE IF NOT EXISTS cbt_progress (id SERIAL PRIMARY KEY, nickname TEXT, subject_key TEXT, used INTEGER DEFAULT 0, UNIQUE(nickname, subject_key))"))
+        db.commit()
 
     total_limit = FREE_Q + PAID_Q if user.get('is_verified') else FREE_Q
 
@@ -332,7 +337,13 @@ def cbt_exam(nickname, user, key, sub):
         if len(all_q) == 0:
             return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>😕 No Questions Yet for {sub}</h2><a class=btn.blue href=/exam>Back</a></div>"), timer_script="")
 
-    done_count = user['q_used']
+        # GET PER-SUBJECT PROGRESS
+        prog = db.execute(sa.text("SELECT used FROM cbt_progress WHERE nickname=:u AND subject_key=:k"), {"u": nickname, "k": full_key}).scalar()
+        if prog is None:
+            db.execute(sa.text("INSERT INTO cbt_progress (nickname, subject_key, used) VALUES (:u, :k, 0) ON CONFLICT (nickname, subject_key) DO NOTHING"), {"u": nickname, "k": full_key})
+            db.commit()
+            prog = 0
+        done_count = prog
 
     if done_count >= total_limit or done_count >= len(all_q):
         return render_template_string(BASE, title="Done", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>✅ You have completed all {min(total_limit, len(all_q))} questions for {sub}</h2><p>Score: {user['correct']} Correct, {user['wrong']} Wrong</p><a class=btn href=/exam>Back</a></div>"), timer_script="")
@@ -340,9 +351,6 @@ def cbt_exam(nickname, user, key, sub):
     start_index = done_count
     end_index = min(start_index + BATCH_SIZE, total_limit, len(all_q))
     batch_q = all_q[start_index:end_index]
-
-    if len(batch_q) == 0:
-        return render_template_string(BASE, title="Done", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>✅ You have completed all questions for {sub}</h2><a class=btn href=/exam>Back</a></div>"), timer_script="")
 
     questions = [dict(q) for q in batch_q]
     for q in questions: q['options'] = json.loads(q['options'])
@@ -356,11 +364,13 @@ def cbt_exam(nickname, user, key, sub):
             if user_ans == q["ans"]: score += 1
             result_html += f"<div class='card'><h4>Q{start_index + i + 1}: {q['q']}</h4><p><b>Your Answer:</b> {user_ans or 'Not Answered'}</p><p><b>Correct Answer:</b> {q['ans']}</p></div>"
 
-        total = len(questions); wrong = total - score; percent = round((score/total)*100,1)
-        grade = "A" if percent>=70 else "B" if percent>=60 else "C" if percent>=50 else "F"
+        total = len(questions); wrong = total - score
+        new_done_count = done_count + total
 
-        new_done_count = done_count + total # FIXED: use this for display
         with DBSession() as db:
+            # UPDATE PER-SUBJECT PROGRESS
+            db.execute(sa.text("UPDATE cbt_progress SET used=:u WHERE nickname=:n AND subject_key=:k"), {"u": new_done_count, "n": nickname, "k": full_key})
+            # UPDATE GLOBAL STATS FOR /me PAGE
             if not user.get('is_verified'):
                 db.execute(sa.text("UPDATE users SET free_questions_used=free_questions_used+:t, q_used=q_used+:t, correct=correct+:c, wrong=wrong+:w WHERE nickname=:u"), {"t": total, "c": score, "w": wrong, "u": nickname})
             else:
@@ -370,7 +380,7 @@ def cbt_exam(nickname, user, key, sub):
         remaining = min(total_limit, len(all_q)) - new_done_count
         next_btn = f"<a class=btn href=/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}>Start Next 10 Questions - Batch {batch_number + 1}</a>" if remaining > 0 else ""
 
-        content = f"<div class='card'><h2>🎉 BATCH {batch_number} RESULT</h2><p><b>Score: {score}/{total}</b></p><p><b>Grade: {grade}</b></p><p><b>Questions Completed: {new_done_count}/{min(total_limit, len(all_q))}</b></p></div>{result_html}{next_btn}<a class=btn.blue href=/exam>Back to Subjects</a>" # FIXED
+        content = f"<div class='card'><h2>🎉 BATCH {batch_number} RESULT</h2><p><b>Score: {score}/{total}</b></p><p><b>Questions Completed: {new_done_count}/{min(total_limit, len(all_q))}</b></p></div>{result_html}{next_btn}<a class=btn.blue href=/exam>Back to Subjects</a>"
         return render_template_string(BASE, title="Result", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
     q_html = ""
