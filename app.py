@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, request, redirect, session
+from flask import Flask, render_template_string, request, redirect, session, Response
 from markupsafe import Markup
 from datetime import date, datetime, timedelta
 import random, json, os, urllib.parse, csv, math
@@ -9,39 +9,40 @@ from sqlalchemy.orm import sessionmaker
 import pytz
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', "motiz_secret_key_2026_v30")
+app.secret_key = os.environ.get('SECRET_KEY', "motiz_secret_key_2026_v31")
 app.config['PROPAGATE_EXCEPTIONS'] = True
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
     raise Exception("DATABASE_URL environment variable is not set")
-
-# FIX FOR RENDER POSTGRES
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 engine = sa.create_engine(DATABASE_URL)
 DBSession = sessionmaker(bind=engine)
 
-# ====== SETTINGS - FINAL LOCKED ======
+# ====== SETTINGS - V31 FINAL LOCKED ======
 PALMPAY_ACCOUNT = "8908025244"
 PALMPAY_NAME = "HAMZAT KOLADE AJIMOTI"
 PALMPAY_BANK = "PALMPAY"
 LESSON_PRICE = 1000
 QUESTION_PRICE = 500
 ADMIN_PASS = os.environ.get('ADMIN_PASS', "24434")
-FREE_Q = 30
+FREE_Q = 10
 PAID_Q = 70
-BATCH_SIZE = 10 # NEW: 10 QUESTIONS PER BATCH
-TIME_PER_BATCH = BATCH_SIZE * 90 # NEW: 15 MINUTES
+BATCH_SIZE = 10
 NIGERIA_TZ = pytz.timezone('Africa/Lagos')
 FAVICON_URL = "https://i.imgur.com/5TCBgkN.png"
 SEND_BTN_URL = "https://i.imgur.com/ADGwy5l.png"
 BASE_URL = "https://motiz-e-learning-institution.onrender.com"
 
-# ====== YOUR EXACT SUBJECT LIST ======
-JSS_SUBJECTS = ["English Language", "Mathematics", "Basic Science", "Basic Technology", "Social Studies", "Civic Education", "Business Studies", "Agricultural Science", "Christian / Islamic Religious Studies (CRS/IRS)", "Physical and Health Education (PHE)"]
+# ADS - PERMANENT
+FIXED_AD_KEY = "f0869e31689755e244912b438511f4a9"
+NATIVE_FEED_SRC = "https://pl31392647.profitableratecpmnetwork.com/1b/30/4d/1b304d26da2adb6df287de5560168dca.js"
 
+CALC_SUBJECTS = ["Mathematics", "Physics", "Chemistry", "Further Mathematics", "Financial Accounting", "Economics", "Biology"]
+
+JSS_SUBJECTS = ["English Language", "Mathematics", "Basic Science", "Basic Technology", "Social Studies", "Civic Education", "Business Studies", "Agricultural Science", "Christian / Islamic Religious Studies (CRS/IRS)", "Physical and Health Education (PHE)"]
 CLASSES = ["JSS1", "JSS2", "JSS3", "SS1", "SS2", "SS3"]
 SUBJECTS = {
     "JSS1": JSS_SUBJECTS, "JSS2": JSS_SUBJECTS, "JSS3": JSS_SUBJECTS,
@@ -56,73 +57,58 @@ SUBJECTS = {
     "SS3_Art": ["English Language", "Mathematics", "Civic Education", "Literature in English", "Government", "Christian / Islamic Religious Studies (CRS/IRS)", "Yoruba", "Economics", "Computer Studies / ICT", "Craft"]
 }
 
-# ====== CREATE TABLES + INITIAL DATA ======
 def init_db():
     with engine.connect() as conn:
-        conn.execute(sa.text("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, nickname TEXT UNIQUE, name TEXT, password TEXT, class TEXT, dept TEXT, q_cycle TEXT DEFAULT 'free', q_used INTEGER DEFAULT 0, free_questions_used INTEGER DEFAULT 0, lesson_expiry DATE, correct INTEGER DEFAULT 0, wrong INTEGER DEFAULT 0, friends TEXT DEFAULT '[]', referred_by TEXT DEFAULT NULL, referral_count INTEGER DEFAULT 0, free_days INTEGER DEFAULT 0, is_verified BOOLEAN DEFAULT FALSE, payment_verified_date TEXT);"))
+        conn.execute(sa.text("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, nickname TEXT UNIQUE, name TEXT, password TEXT, class TEXT, dept TEXT, q_cycle TEXT DEFAULT 'free', q_used INTEGER DEFAULT 0, free_questions_used INTEGER DEFAULT 0, lesson_expiry DATE, correct INTEGER DEFAULT 0, wrong INTEGER DEFAULT 0, friends TEXT DEFAULT '[]', referred_by TEXT DEFAULT NULL, referral_count INTEGER DEFAULT 0, free_days INTEGER DEFAULT 0, is_verified BOOLEAN DEFAULT FALSE, payment_verified_date TEXT, last_seen TIMESTAMP);"))
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS payments (id SERIAL PRIMARY KEY, nickname TEXT, name TEXT, type TEXT, status TEXT, bank_used TEXT, account_name TEXT, date_paid TEXT);"))
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS friend_requests (id SERIAL PRIMARY KEY, from_nickname TEXT, to_nickname TEXT, status TEXT DEFAULT 'Pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"))
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS posts (id SERIAL PRIMARY KEY, nickname TEXT, name TEXT, text TEXT, likes TEXT DEFAULT '[]', comments TEXT DEFAULT '[]', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"))
-        conn.execute(sa.text("CREATE TABLE IF NOT EXISTS dms (id SERIAL PRIMARY KEY, from_nickname TEXT, to_nickname TEXT, text TEXT, time TEXT, read_by TEXT DEFAULT '[]');"))
+        conn.execute(sa.text("CREATE TABLE IF NOT EXISTS dms (id SERIAL PRIMARY KEY, from_nickname TEXT, to_nickname TEXT, text TEXT, time TEXT, read_by TEXT DEFAULT '[]', delivered_to TEXT DEFAULT '[]');"))
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS groups (id SERIAL PRIMARY KEY, name TEXT, creator TEXT, members TEXT DEFAULT '[]', messages TEXT DEFAULT '[]');"))
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS lessons (id SERIAL PRIMARY KEY, class TEXT, dept TEXT, subject TEXT, title TEXT, notes TEXT, date TEXT, media_link TEXT DEFAULT '');"))
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS questions (id SERIAL PRIMARY KEY, key TEXT, q TEXT, options TEXT, ans TEXT);"))
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);"))
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS referrals (id SERIAL PRIMARY KEY, referrer TEXT, referred TEXT, paid BOOLEAN DEFAULT FALSE, bonus_given BOOLEAN DEFAULT FALSE);"))
+        conn.execute(sa.text("CREATE TABLE IF NOT EXISTS cbt_progress (id SERIAL PRIMARY KEY, nickname TEXT, subject_key TEXT, used INTEGER DEFAULT 0, UNIQUE(nickname, subject_key));"))
         conn.commit()
 init_db()
 
-# ====== FIX OLD USERS WITH NULL VALUES + ADD MISSING COLUMNS - FINAL ======
 def fix_old_users():
     with DBSession() as db:
-        int_cols = ["free_questions_used","q_used","correct","wrong","referral_count","free_days"]
-        text_cols = ["friends","referred_by","payment_verified_date"]
-        date_cols = ["lesson_expiry"]
-        bool_cols = ["is_verified"]
-
-        for col in int_cols:
+        cols = [("users","free_questions_used","INTEGER DEFAULT 0"),("users","q_used","INTEGER DEFAULT 0"),("users","correct","INTEGER DEFAULT 0"),("users","wrong","INTEGER DEFAULT 0"),("users","referral_count","INTEGER DEFAULT 0"),("users","free_days","INTEGER DEFAULT 0"),("users","friends","TEXT DEFAULT '[]'"),("users","referred_by","TEXT"),("users","payment_verified_date","TEXT"),("users","lesson_expiry","DATE"),("users","is_verified","BOOLEAN DEFAULT FALSE"),("users","last_seen","TIMESTAMP"),("dms","delivered_to","TEXT DEFAULT '[]'"),("lessons","media_link","TEXT DEFAULT ''")]
+        for table,col,typ in cols:
             try:
-                db.execute(sa.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} INTEGER DEFAULT 0"))
+                db.execute(sa.text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {typ}"))
                 db.commit()
             except:
                 db.rollback()
-        for col in text_cols:
-            try:
-                db.execute(sa.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} TEXT"))
-                db.commit()
-            except:
-                db.rollback()
-        for col in date_cols:
-            try:
-                db.execute(sa.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} DATE"))
-                db.commit()
-            except:
-                db.rollback()
-        for col in bool_cols:
-            try:
-                db.execute(sa.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} BOOLEAN DEFAULT FALSE"))
-                db.commit()
-            except:
-                db.rollback()
-
         try:
-            db.execute(sa.text("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS media_link TEXT DEFAULT ''"))
-            db.commit()
-        except:
-            db.rollback()
-
-        try:
-            db.execute(sa.text("UPDATE users SET free_questions_used = COALESCE(free_questions_used, 0)"))
-            db.execute(sa.text("UPDATE users SET q_used = COALESCE(q_used, 0)"))
-            db.execute(sa.text("UPDATE users SET correct = COALESCE(correct, 0)"))
-            db.execute(sa.text("UPDATE users SET wrong = COALESCE(wrong, 0)"))
-            db.execute(sa.text("UPDATE users SET lesson_expiry = NULL WHERE lesson_expiry IS NULL"))
+            db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE last_seen IS NULL"))
             db.commit()
         except:
             db.rollback()
 fix_old_users()
 
-# ====== HELPER FUNCTIONS ======
+def ensure_motiz_support():
+    with DBSession() as db:
+        exists = db.execute(sa.text("SELECT nickname FROM users WHERE nickname='motiz_support'")).scalar()
+        if not exists:
+            db.execute(sa.text("INSERT INTO users (nickname,name,password,class,dept,friends,is_verified,last_seen) VALUES ('motiz_support','MOTIZ SUPPORT','motiz_support_2026','SS3','Science','[]',TRUE,NOW()) ON CONFLICT (nickname) DO NOTHING"))
+            db.commit()
+        all_users = db.execute(sa.text("SELECT nickname, friends FROM users WHERE nickname!='motiz_support'")).mappings().all()
+        for u in all_users:
+            try:
+                fr = json.loads(u['friends'] or '[]')
+                if 'motiz_support' not in fr:
+                    fr.append('motiz_support')
+                    db.execute(sa.text("UPDATE users SET friends=:f WHERE nickname=:u"), {"f": json.dumps(fr), "u": u['nickname']})
+            except: pass
+        db.commit()
+        all_nicks = db.execute(sa.text("SELECT nickname FROM users WHERE nickname!='motiz_support'")).scalars().all()
+        db.execute(sa.text("UPDATE users SET friends=:f WHERE nickname='motiz_support'"), {"f": json.dumps(all_nicks)})
+        db.commit()
+ensure_motiz_support()
+
 def get_setting(key, default=""):
     with DBSession() as db:
         val = db.execute(sa.text("SELECT value FROM settings WHERE key=:k"), {"k": key}).scalar()
@@ -143,7 +129,7 @@ def get_user():
         user = db.execute(sa.text("SELECT * FROM users WHERE nickname=:u"), {"u": nickname}).mappings().first()
         if user:
             user = dict(user)
-            user['friends'] = json.loads(user.get('friends', '[]'))
+            user['friends'] = json.loads(user.get('friends', '[]') or '[]')
         return nickname, user
 
 def delete_old_posts_and_notices():
@@ -170,11 +156,13 @@ def login_required(f):
         delete_old_posts_and_notices()
         return f(nickname, user, *args, **kwargs)
     return wrapper
-# ====== BASE HTML - UPDATED: ADDED TIMER + OPTION CSS ======
+
 BASE = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="{FAVICON_URL}">
-<title>{{{{title}}}}</title><style>:root{{--bg:#f0f2f5;--card:white;--text:#333;--primary:#0f3460}} body.dark{{--bg:#121212;--card:#1e1e1e;--text:#eee}}
-body{{font-family:Segoe UI;background:var(--bg);color:var(--text);margin:0;padding:0;padding-bottom:120px}}
+<link rel="manifest" href="/manifest.json">
+<title>{{{{title}}}}</title><style>
+:root{{--bg:#f0f2f5;--card:white;--text:#333;--primary:#0f3460}} body.dark{{--bg:#121212;--card:#1e1e1e;--text:#eee}}
+body{{font-family:Segoe UI;background:var(--bg);color:var(--text);margin:0;padding:0;padding-bottom:100px}}
 .header{{background:var(--primary);color:white;padding:10px;text-align:center;position:fixed;top:0;width:100%;z-index:1000;display:flex;justify-content:space-between;align-items:center}}
 .header h1{{margin:0;font-size:0.85rem;flex:1;text-align:center;line-height:1.1;white-space:nowrap}}
 .header img.logo{{width:70px;height:70px;border-radius:50%;margin-left:5px}}
@@ -182,44 +170,90 @@ body{{font-family:Segoe UI;background:var(--bg);color:var(--text);margin:0;paddi
 .exit-btn{{background:transparent;color:white;border:none;padding:5px 10px;text-decoration:none;font-size:1.5rem;margin-left:10px}}
 .nav{{display:flex;gap:5px;background:#16213e;padding:5px;flex-wrap:wrap;position:fixed;top:80px;width:100%;overflow-x:auto;z-index:999}}
 .nav a{{color:white;text-decoration:none;padding:5px 8px;border-radius:10px;border:1px solid #fff3;font-size:0.8rem}}
-.container{{padding:10px;padding-top:135px}}
+.container{{padding:10px;padding-top:135px;padding-bottom:30px}}
 .card{{background:var(--card);padding:12px;margin:8px 0;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}}
+.card:last-child{{margin-bottom:110px !important}}
 .btn{{background:#28a745;color:white;padding:12px 15px;text-decoration:none;border-radius:8px;display:block;margin:8px 0;text-align:center;font-weight:bold;border:none;width:100%;cursor:pointer}}
-.btn.red{{background:#e94560}}.btn.blue{{background:#2196f3}}.btn.orange{{background:#ff9800}}.btn.gray{{background:#6c757d;font-size:0.9rem;padding:8px;margin:6px 0}}
+.btn.red{{background:#e94560}}.btn.blue{{background:#0f3460;color:white;border:1px solid white}}.btn.orange{{background:#ff9800}}.btn.gray{{background:#0f3460;color:white;font-size:0.9rem;padding:10px;margin:6px 0;border:1px solid #fff2}}
 input,select,textarea{{width:100%;padding:10px;margin:5px 0;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;font-size:1rem;background:var(--card);color:var(--text)}}
 .success{{color:green;background:#d4edda;padding:10px;border-radius:5px}}.error{{color:red;background:#f8d7da;padding:10px;border-radius:5px}}
-.badge{{background:#28a745;color:white;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:5px}}
+.badge{{background:#1DA1F2;color:white;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:5px}}
 .notice-title{{font-size:1.1rem;font-weight:bold;color:var(--primary);margin-bottom:5px}}
-.timer{{background:#e94560;color:white;padding:12px;text-align:center;border-radius:8px;font-weight:bold;font-size:1.1rem;margin-bottom:10px}}
+.timer{{background:#e94560;color:white;padding:12px;text-align:center;border-radius:8px;font-weight:bold;font-size:1.1rem;margin-bottom:10px;position:sticky;top:135px;z-index:998}}
 .option{{background:#f0f2f5;padding:14px;margin:10px 0;border-radius:8px;border:1px solid #ddd;color:black;display:flex;align-items:flex-start;gap:10px}}
 .option input{{margin-top:4px;flex-shrink:0;width:18px;height:18px}}
 .option span{{flex:1;line-height:1.4}}
 .chat-msg{{display:flex;margin:8px 0;align-items:flex-end;gap:8px}}.chat-msg.me{{justify-content:flex-end}}.chat-msg.other{{justify-content:flex-start}}
 .bubble{{display:flex;flex-direction:column;padding:10px 14px;border-radius:18px;max-width:70%;box-shadow:0 1px 1px rgba(0,0,0,0.1)}}
 .me.bubble{{background:#2196f3!important;color:white!important;border-bottom-right-radius:4px}}
-.other.bubble{{background:#e0e0e0;color:#333;border-bottom-left-radius:4px}}body.dark.other.bubble{{background:#333;color:#eee}}
+.other.bubble{{background:#e0e0e0;color:#333;border-bottom-left-radius:4px}}body.dark .other.bubble{{background:#333;color:#eee}}
 .bubble-text{{margin-bottom:4px;word-wrap:break-word}}
-.bubble-time{{font-size:11px;opacity:0.8;align-self:flex-end;margin-top:2px}}
+.bubble-time{{font-size:11px;opacity:0.8;align-self:flex-end;margin-top:2px;display:flex;gap:4px}}
 .chat-avatar{{width:32px;height:32px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:bold}}
 .friend-card{{display:flex;align-items:center;gap:10px;padding:12px;background:var(--card);border-radius:10px;margin:8px 0;text-decoration:none;color:var(--text)}}
 .friend-avatar{{width:45px;height:45px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-weight:bold}}
 .notification{{position:absolute;top:-5px;right:-5px;background:red;color:white;border-radius:50%;width:18px;height:18px;font-size:0.7rem;display:flex;align-items:center;justify-content:center}}
 .readonly-box{{width:100%;padding:12px;background:#eee;border:1px dashed #999;font-size:1.1rem;font-weight:bold;text-align:center;user-select:all}}
-.chat-input-fixed{{position:fixed;bottom:10px;left:10px;right:10px;display:flex;gap:5px;background:var(--card);padding:10px;border-radius:15px;box-shadow:0 -2px 10px rgba(0,0,0,0.1)}}
+.chat-input-fixed{{position:fixed;bottom:95px;left:10px;right:10px;display:flex;gap:5px;background:var(--card);padding:10px;border-radius:15px;box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:999}}
 .send-img-btn{{background:transparent;border:none;padding:0;cursor:pointer}}
 .send-img-btn img{{height:40px;width:40px}}
 .lesson-media{{width:100%;border-radius:10px;margin-top:8px}}
-</style></head><body>{{{{header}}}}<div class="container">{{{{content}}}}</div><script>{{{{timer_script}}}}</script></body></html>"""
+.motiz-support{{border:2px solid #1DA1F2;background:#e8f5fe !important;font-weight:bold}}
+.motiz-support .bubble-text{{font-family:monospace;font-weight:bold;color:#0f3460}}
+#fixedAdBar{{position:fixed;bottom:0;left:0;width:100%;height:90px;background:white;z-index:99999;border-top:1px solid #ddd;display:flex;align-items:center;justify-content:center;overflow:hidden}}
+#updateBanner{{display:none;position:fixed;top:0;left:0;width:100%;background:#ff9800;color:white;padding:10px;text-align:center;z-index:100001}}
+</style></head><body>
+<div id="updateBanner">🔄 New version available - <button onclick="location.reload(true)" style="background:white;color:#ff9800;border:none;padding:5px 10px;border-radius:5px;font-weight:bold;">Update now</button></div>
+{{{{header}}}}<div class="container">{{{{content}}}}</div>
+
+<div id="fixedAdBar">
+  <button onclick="document.getElementById('fixedAdBar').style.display='none';document.body.style.paddingBottom='0px'" style="position:absolute;top:3px;right:5px;z-index:100000;background:#000;color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;">X</button>
+  <div style="width:728px;max-width:100%;height:90px;display:flex;align-items:center;justify-content:center;">
+    <script>atOptions = {{'key' : 'f0869e31689755e244912b438511f4a9','format' : 'iframe','height' : 90,'width' : 728,'params' : {{}} }};</script>
+    <script src="https://www.highrevenueformat.com/f0869e31689755e244912b438511f4a9/invoke.js"></script>
+  </div>
+</div>
+
+<script>
+{{{{timer_script}}}}
+if(window.location.pathname.startsWith('/exam') || window.location.pathname.startsWith('/cbt/')){{
+  var ad=document.getElementById('fixedAdBar'); if(ad) ad.style.display='none'; document.body.style.paddingBottom='0px';
+  var chatInput=document.querySelector('.chat-input-fixed'); if(chatInput) chatInput.style.bottom='10px';
+}}
+let initialHeight = window.innerHeight;
+window.addEventListener('resize', function(){{
+  let ad=document.getElementById('fixedAdBar'); if(!ad) return;
+  if(window.innerHeight < initialHeight - 150){{ ad.style.display='none'; }}
+  else{{
+    if(!window.location.pathname.startsWith('/exam') && !window.location.pathname.startsWith('/cbt/')){{
+      ad.style.display='flex'; document.body.style.paddingBottom='100px';
+    }}
+  }}
+}});
+if('serviceWorker' in navigator){{ navigator.serviceWorker.register('/sw.js').then(reg=>{{ reg.onupdatefound=()=>{{ document.getElementById('updateBanner').style.display='block'; }} }}); }}
+</script>
+</body></html>"""
 
 def get_header(nickname,user, show_nav=True, show_favicon=False):
     if not user: return ""
     exit_html = '<a href="/main" class="exit-btn">🔙</a>' if not show_favicon else ""
     favicon_html = f'<img src="{FAVICON_URL}" class="logo">' if show_favicon else ""
     theme_html = '<button class="theme-btn" onclick="document.body.classList.toggle(\'dark\')">🌙</button>'
-    verified = '<span class=badge>✓ Verified</span>' if user.get('is_verified') else ""
+    is_support = nickname=='motiz_support' or user.get('nickname')=='motiz_support'
+    if is_support:
+        verified = '<span class=badge>✓ MOTIZ SUPPORT</span>'
+    else:
+        verified = '<span class=badge>✓ Verified</span>' if user.get('is_verified') else ""
     nav_html = """<div class="nav"><a href="/main">🏠 Home</a><a href="/exam">✍️ CBT</a><a href="/lessons">🎓 Lessons</a><a href="/community">🌍 Community</a><a href="/chat">💬 Chat</a><a href="/me">👤 Me</a></div>""" if show_nav else ""
     return f"""<div class="header">{favicon_html}{exit_html}<h1>MOTIZ E-LEARNING {verified}</h1>{theme_html}</div>{nav_html}"""
 
+@app.route('/manifest.json')
+def manifest():
+    return Response(json.dumps({"name":"MOTIZ E-LEARNING","short_name":"MOTIZ","start_url":"/main","display":"standalone","background_color":"#0f3460","theme_color":"#0f3460","icons":[{"src":FAVICON_URL,"sizes":"192x192","type":"image/png"}]}), mimetype='application/json')
+
+@app.route('/sw.js')
+def sw():
+    return Response("self.addEventListener('install', e=>self.skipWaiting()); self.addEventListener('activate', e=>self.clients.claim()); self.addEventListener('fetch', e=>{e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)))});", mimetype='application/javascript')
 @app.route('/')
 def splash():
     return render_template_string(f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Welcome</title><link rel="icon" type="image/png" href="{FAVICON_URL}"><meta http-equiv="refresh" content="10;url=/login">
@@ -234,6 +268,7 @@ def splash():
 </style></head><body>
 <div class="bulb">📖</div>
 <div class="logo">MOTIZ E-LEARNING INSTITUTION</div><div class="subtext">Learn. Practice. Excel.</div><div class="progress-bar"><div class="progress-fill"></div></div></body></html>""")
+
 @app.route('/register', methods=["GET","POST"])
 def register():
     if get_user()[1]: return redirect("/main")
@@ -245,7 +280,7 @@ def register():
             if exists: error = "<div class=error>Nickname taken</div>"
             else:
                 name = f"{request.form['surname']} {request.form['other']}"
-                db.execute(sa.text("INSERT INTO users (nickname,name,password,class,dept,referred_by) VALUES (:u,:n,:p,:c,:d,:r)"),
+                db.execute(sa.text("INSERT INTO users (nickname,name,password,class,dept,referred_by,last_seen) VALUES (:u,:n,:p,:c,:d,:r,NOW())"),
                            {"u": nickname, "n": name, "p": request.form['password'], "c": request.form['class'], "d": request.form.get('dept',''), "r": ref})
                 if ref: db.execute(sa.text("INSERT INTO referrals (referrer, referred) VALUES (:r, :ref)"), {"r": ref, "ref": nickname})
                 db.commit()
@@ -270,6 +305,10 @@ def login():
 @app.route('/main')
 @login_required
 def main(nickname, user):
+    # UPDATE LAST_SEEN - V31 NEW
+    with DBSession() as db:
+        db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname})
+        db.commit()
     pinned_html = ""
     if PINNED_NOTICE:
         try: pin = json.loads(PINNED_NOTICE); pinned_html = f"<div class='card' style='border:2px solid gold'><div class=notice-title>📌 {pin['title']}</div>{pin['text']}</div>"
@@ -289,8 +328,7 @@ def main(nickname, user):
 def logout():
     session.clear()
     return redirect("/login")
-
-# ====== NEW CBT SYSTEM - 10 QUESTIONS BATCH ======
+# ====== CBT - V31 PER SUBJECT 10 FREE + SHUFFLE + SMART TIMER ======
 @app.route('/exam')
 @login_required
 def exam(nickname, user):
@@ -308,105 +346,124 @@ def exam(nickname, user):
                 user['is_verified'] = False
         except: pass
 
-    if not user.get('is_verified') and user['free_questions_used'] >= FREE_Q:
-        with DBSession() as db: pending = db.execute(sa.text("SELECT * FROM payments WHERE nickname=:u AND type='questions' AND status='Pending'"), {"u": nickname}).scalar()
-        if pending:
-            content = "<div class=card><h2>⏳ Payment Under Review</h2><p>Admin is verifying your payment. You will get 70 more questions once approved.</p></div>"
-        else:
-            content = f'<div class=card><h2>🔒 Unlock 70 More Questions</h2><p>Continue practicing</p><p><b>Pay &#8358;{QUESTION_PRICE} to continue</b></p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account Number:</b><input class=readonly-box readonly value="{PALMPAY_ACCOUNT}"><br><b>Account Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/questions><input name=bank_used placeholder="Bank you used to transfer" required><input name=account_name placeholder="Account Name you used" required><button class="send-img-btn"><img src="{SEND_BTN_URL}"></button></form></div>'
-        return render_template_string(BASE, title="CBT Payment", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
+    sub_btns = ""
+    with DBSession() as db:
+        for s in subs:
+            full_key = f"{key}_{s}"
+            prog = db.execute(sa.text("SELECT used FROM cbt_progress WHERE nickname=:u AND subject_key=:k"), {"u": nickname, "k": full_key}).scalar()
+            if prog is None: prog = 0
+            total_q = db.execute(sa.text("SELECT COUNT(*) FROM questions WHERE key=:k"), {"k": full_key}).scalar() or 0
+            limit = FREE_Q if not user.get('is_verified') else FREE_Q + PAID_Q
+            done = min(prog, total_q, limit)
+            if done >= limit or (total_q>0 and done >= total_q):
+                btn = f"<div class='card' style='border:2px solid #28a745'><b>📚 {s}</b> - ✅ Completed {done}/{min(limit,total_q)} <br><a class='btn blue' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}?redo=1'>🔄 Redo / Reset</a></div>"
+            else:
+                remain_free = max(0, FREE_Q - prog) if not user.get('is_verified') else 0
+                if not user.get('is_verified') and prog >= FREE_Q:
+                    btn = f"<div class='card' style='border:2px solid #e94560'><b>📚 {s}</b> - 🔒 Pay to continue (10/{FREE_Q} free done)<br><a class='btn red' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}'>Unlock - Pay ₦{QUESTION_PRICE}</a></div>"
+                else:
+                    btn = f"<a class='btn blue' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}'>📚 {s} - {done}/{min(limit,total_q)} done (Free left: {remain_free})</a>"
+            sub_btns += btn
 
-    sub_btns = "".join([f"<a class='btn blue' href=/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}>📚 {s}</a>" for s in subs])
-    return render_template_string(BASE, title="CBT", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class='card'><h2>Subjects for {user['class']} {user.get('dept','')}</h2><p>10 Questions per attempt. 15 Minutes.</p>{sub_btns}</div>"), timer_script="")
+    # check overall paywall if all subjects exhausted free and not verified
+    if not user.get('is_verified'):
+        with DBSession() as db:
+            pending = db.execute(sa.text("SELECT * FROM payments WHERE nickname=:u AND type='questions' AND status='Pending'"), {"u": nickname}).scalar()
+        if pending:
+            sub_btns = "<div class='card'><h2>⏳ Payment Under Review</h2><p>Admin verifying - you will get 70 more per subject once approved.</p></div>" + sub_btns
+        # no global paywall now - per subject only
+
+    return render_template_string(BASE, title="CBT", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class='card'><h2>Subjects for {user['class']} {user.get('dept','')}</h2><p>10 FREE per subject. Shuffle + Smart timer.</p>{sub_btns}</div>"), timer_script="")
 
 @app.route('/cbt/<path:key>/<path:sub>', methods=["GET","POST"])
 @login_required
 def cbt_exam(nickname, user, key, sub):
     key = urllib.parse.unquote(key); sub = urllib.parse.unquote(sub)
     full_key = f"{key}_{sub}"
-    
-    # CREATE PROGRESS TABLE IF NOT EXISTS
-    with DBSession() as db:
-        db.execute(sa.text("CREATE TABLE IF NOT EXISTS cbt_progress (id SERIAL PRIMARY KEY, nickname TEXT, subject_key TEXT, used INTEGER DEFAULT 0, UNIQUE(nickname, subject_key))"))
-        db.commit()
-
-    total_limit = FREE_Q + PAID_Q if user.get('is_verified') else FREE_Q
+    redo = request.args.get('redo')
 
     with DBSession() as db:
-        all_q = db.execute(sa.text("SELECT * FROM questions WHERE key=:k ORDER BY id ASC"), {"k": full_key}).mappings().all()
-        if len(all_q) == 0:
+        if redo:
+            db.execute(sa.text("UPDATE cbt_progress SET used=0 WHERE nickname=:u AND subject_key=:k"), {"u": nickname, "k": full_key})
+            db.commit()
+            return redirect(f"/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}")
+
+        all_count = db.execute(sa.text("SELECT COUNT(*) FROM questions WHERE key=:k"), {"k": full_key}).scalar() or 0
+        if all_count == 0:
             return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>😕 No Questions Yet for {sub}</h2><a class=btn.blue href=/exam>Back</a></div>"), timer_script="")
 
-        # GET PER-SUBJECT PROGRESS
         prog = db.execute(sa.text("SELECT used FROM cbt_progress WHERE nickname=:u AND subject_key=:k"), {"u": nickname, "k": full_key}).scalar()
         if prog is None:
             db.execute(sa.text("INSERT INTO cbt_progress (nickname, subject_key, used) VALUES (:u, :k, 0) ON CONFLICT (nickname, subject_key) DO NOTHING"), {"u": nickname, "k": full_key})
             db.commit()
             prog = 0
-        done_count = prog
 
-    if done_count >= total_limit or done_count >= len(all_q):
-        return render_template_string(BASE, title="Done", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>✅ You have completed all {min(total_limit, len(all_q))} questions for {sub}</h2><p>Score: {user['correct']} Correct, {user['wrong']} Wrong</p><a class=btn href=/exam>Back</a></div>"), timer_script="")
+    total_limit = FREE_Q + PAID_Q if user.get('is_verified') else FREE_Q
 
-    start_index = done_count
-    end_index = min(start_index + BATCH_SIZE, total_limit, len(all_q))
-    batch_q = all_q[start_index:end_index]
+    if prog >= total_limit or prog >= all_count:
+        if not user.get('is_verified') and prog >= FREE_Q:
+            with DBSession() as db: pending = db.execute(sa.text("SELECT * FROM payments WHERE nickname=:u AND type='questions' AND status='Pending'"), {"u": nickname}).scalar()
+            if pending:
+                content = "<div class=card><h2>⏳ Payment Under Review</h2><p>Admin verifying.</p></div>"
+            else:
+                content = f'<div class=card><h2>🔒 Unlock 70 More Questions for {sub}</h2><p><b>Pay &#8358;{QUESTION_PRICE} for 30 days</b></p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account:</b><input class=readonly-box readonly value="{PALMPAY_ACCOUNT}"><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/questions><input name=bank_used placeholder="Bank you used" required><input name=account_name placeholder="Account Name" required><button class="send-img-btn"><img src="{SEND_BTN_URL}"></button></form><a class=btn.blue href="/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1">🔄 Redo Free 10</a></div>'
+            return render_template_string(BASE, title="Paywall", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
+
+    start_index = prog
+    end_index = min(start_index + BATCH_SIZE, total_limit, all_count)
+
+    # SHUFFLE + SMART TIMER
+    with DBSession() as db:
+        batch_q = db.execute(sa.text(f"SELECT * FROM questions WHERE key=:k ORDER BY RANDOM() LIMIT :limit OFFSET :off"), {"k": full_key, "limit": end_index-start_index, "off": start_index}).mappings().all()
 
     questions = [dict(q) for q in batch_q]
     for q in questions: q['options'] = json.loads(q['options'])
 
+    if not questions:
+        return render_template_string(BASE, title="Done", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>✅ Completed {sub}</h2><a class=btn href=/exam>Back</a><a class=btn.blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo</a></div>"), timer_script="")
+
+    time_per_q = 60 if sub in CALC_SUBJECTS else 30
+    batch_time = len(questions) * time_per_q
+
     if request.method == "POST":
         score = 0; result_html = "";
-        batch_number = math.floor(done_count / BATCH_SIZE) + 1
-
         for i,q in enumerate(questions):
             user_ans = request.form.get(f"q{i}")
             if user_ans == q["ans"]: score += 1
-            result_html += f"<div class='card'><h4>Q{start_index + i + 1}: {q['q']}</h4><p><b>Your Answer:</b> {user_ans or 'Not Answered'}</p><p><b>Correct Answer:</b> {q['ans']}</p></div>"
-
+            result_html += f"<div class='card'><h4>Q{start_index + i + 1}: {q['q']}</h4><p><b>Your Answer:</b> {user_ans or 'Not Answered'}</p><p><b>Correct:</b> {q['ans']}</p></div>"
         total = len(questions); wrong = total - score
-        new_done_count = done_count + total
-
+        new_done = prog + total
         with DBSession() as db:
-            # UPDATE PER-SUBJECT PROGRESS
-            db.execute(sa.text("UPDATE cbt_progress SET used=:u WHERE nickname=:n AND subject_key=:k"), {"u": new_done_count, "n": nickname, "k": full_key})
-            # UPDATE GLOBAL STATS FOR /me PAGE
-            if not user.get('is_verified'):
-                db.execute(sa.text("UPDATE users SET free_questions_used=free_questions_used+:t, q_used=q_used+:t, correct=correct+:c, wrong=wrong+:w WHERE nickname=:u"), {"t": total, "c": score, "w": wrong, "u": nickname})
-            else:
-                db.execute(sa.text("UPDATE users SET q_used=q_used+:t, correct=correct+:c, wrong=wrong+:w WHERE nickname=:u"), {"t": total, "c": score, "w": wrong, "u": nickname})
+            db.execute(sa.text("UPDATE cbt_progress SET used=:u WHERE nickname=:n AND subject_key=:k"), {"u": new_done, "n": nickname, "k": full_key})
+            db.execute(sa.text("UPDATE users SET q_used=q_used+:t, correct=correct+:c, wrong=wrong+:w WHERE nickname=:u"), {"t": total, "c": score, "w": wrong, "u": nickname})
             db.commit()
-
-        remaining = min(total_limit, len(all_q)) - new_done_count
-        next_btn = f"<a class=btn href=/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}>Start Next 10 Questions - Batch {batch_number + 1}</a>" if remaining > 0 else ""
-
-        content = f"<div class='card'><h2>🎉 BATCH {batch_number} RESULT</h2><p><b>Score: {score}/{total}</b></p><p><b>Questions Completed: {new_done_count}/{min(total_limit, len(all_q))}</b></p></div>{result_html}{next_btn}<a class=btn.blue href=/exam>Back to Subjects</a>"
+        remaining = min(total_limit, all_count) - new_done
+        next_btn = f"<a class=btn href=/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}>Next 10 - {remaining} left</a>" if remaining>0 else f"<a class=btn.blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo {sub}</a>"
+        content = f"<div class='card'><h2>🎉 RESULT {sub}</h2><p><b>Score: {score}/{total}</b></p><p>Completed: {new_done}/{min(total_limit,all_count)}</p></div>{result_html}{next_btn}<a class=btn.blue href=/exam>Back</a>"
         return render_template_string(BASE, title="Result", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
     q_html = ""
-    batch_number = math.floor(done_count / BATCH_SIZE) + 1
-    global_start = start_index + 1
     for i,q in enumerate(questions):
-        global_q_num = global_start + i
         options = "".join([f"<label class=option><input type=radio name=q{i} value=\"{opt}\" required><span>{opt}</span></label>" for opt in q["options"]])
-        q_html += f"<div class=card id=q{i}><p><b>Question {global_q_num}</b></p><p>{q['q']}</p>{options}</div>"
+        q_html += f"<div class=card id=q{i}><p><b>Question {start_index + i + 1}</b></p><p>{q['q']}</p>{options}</div>"
 
     timer_js = Markup(f"""
-    let timeLeft = {TIME_PER_BATCH};
+    let timeLeft = {batch_time};
     const timerEl = document.createElement('div');
     timerEl.className = 'timer';
     document.querySelector('.container').prepend(timerEl);
     function updateTimer(){{
         let m = Math.floor(timeLeft / 60); let s = timeLeft % 60; s = s < 10? '0' + s : s;
-        timerEl.innerHTML = '⏰ BATCH {batch_number} TIME LEFT: ' + m + ':' + s;
+        timerEl.innerHTML = '⏰ TIME LEFT: ' + m + ':' + s + ' | {sub}';
         if(timeLeft <= 0){{ document.getElementById('cbt_form').submit(); }}
         timeLeft--;
     }}
     updateTimer(); setInterval(updateTimer, 1000);
     """)
 
-    content = f"<form method=POST id=cbt_form><h2 style=color:white;text-align:center>{sub} - BATCH {batch_number}</h2><p style=color:white;text-align:center>Questions {global_start} to {end_index}</p>{q_html}<button class='btn orange'>Submit Batch {batch_number}</button></form>"
-    return render_template_string(BASE, title=f"{sub} Batch {batch_number}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
+    content = f"<form method=POST id=cbt_form><h2 style=color:white;text-align:center>{sub} - Batch {math.floor(prog/BATCH_SIZE)+1}</h2><p style=color:white;text-align:center>{time_per_q}s per question</p>{q_html}<button class='btn orange'>Submit</button></form>"
+    return render_template_string(BASE, title=f"{sub}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
+
 @app.route('/confirm/<t>', methods=["POST"])
 @login_required
 def confirm(nickname, user, t):
@@ -414,7 +471,7 @@ def confirm(nickname, user, t):
         db.execute(sa.text("INSERT INTO payments (nickname, name, type, status, bank_used, account_name, date_paid) VALUES (:u, :n, :t, 'Pending', :b, :a, :d)"),
         {"u": nickname, "n": user["name"], "t": t, "b": request.form["bank_used"], "a": request.form["account_name"], "d": str(date.today())});
         db.commit()
-    return render_template_string(BASE, title="Sent", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class='card'><h2>✅ Request Sent</h2><p>Admin will verify within 24hrs</p><a class=btn href=/exam>Back to CBT</a></div>"), timer_script="")
+    return render_template_string(BASE, title="Sent", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class='card'><h2>✅ Request Sent</h2><p>Admin will verify within 24hrs</p><a class=btn href=/exam>Back</a></div>"), timer_script="")
 
 @app.route('/lessons')
 @login_required
@@ -422,15 +479,15 @@ def lessons(nickname, user):
     access = False
     if user.get('is_verified'): access = True
     else:
-        try: expired = not user.get('lesson_expiry') or date.today() > datetime.strptime(user['lesson_expiry'], "%Y-%m-%d").date()
+        try: expired = not user.get('lesson_expiry') or date.today() > datetime.strptime(str(user['lesson_expiry']), "%Y-%m-%d").date()
         except: expired = True
         if not expired: access = True
 
     if not access:
-        content = f'<div class=card><h2>🔒 Unlock Lessons for 15 Days</h2><p><b>Pay &#8358;{LESSON_PRICE}</b></p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account Number:</b><input class=readonly-box readonly value="{PALMPAY_ACCOUNT}"><br><b>Account Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/lessons><input name=bank_used placeholder="Bank you used to transfer" required><input name=account_name placeholder="Account Name you used" required><button class="send-img-btn"><img src="{SEND_BTN_URL}"></button></form></div>'
+        content = f'<div class=card><h2>🔒 Unlock Lessons for 30 Days</h2><p><b>Pay &#8358;{LESSON_PRICE}</b></p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account:</b><input class=readonly-box readonly value="{PALMPAY_ACCOUNT}"><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/lessons><input name=bank_used placeholder="Bank you used" required><input name=account_name placeholder="Account Name" required><button class="send-img-btn"><img src="{SEND_BTN_URL}"></button></form></div>'
         return render_template_string(BASE, title="Lessons Payment", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
-    access_banner = f"<div class=success>✅ Access Active</div>"
+    access_banner = f"<div class=success>✅ Access Active - 30 Days</div>"
     with DBSession() as db:
         if user.get('dept'):
             lessons = db.execute(sa.text("SELECT * FROM lessons WHERE class=:c AND dept=:d ORDER BY id DESC"), {"c": user['class'], "d": user['dept']}).mappings().all()
@@ -447,21 +504,25 @@ def lessons(nickname, user):
                 media = f"<video src='{l['media_link']}' controls class='lesson-media'></video>"
         lessons_html += f"<div class=card><h3>📖 {l['subject']} - {l['title']}</h3><p>{l['notes']}</p>{media}<small>Posted: {l['date']}</small></div>"
 
-    if not lessons_html: lessons_html = "<p>No lessons for your class yet. Check back later</p>"
+    if not lessons_html: lessons_html = "<p>No lessons yet</p>"
     return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>My Lessons</h2>{access_banner}</div>{lessons_html}"), timer_script="")
 
 @app.route('/community', methods=["GET","POST"])
 @login_required
 def community(nickname, user):
+    is_admin = session.get("admin_logged_in")
     with DBSession() as db:
         if request.method=="POST":
             if "new_post" in request.form:
                 post_text = request.form["post"][:1000]
+                if not is_admin and ('http' in post_text.lower() or 'www.' in post_text.lower()):
+                    # block links for students
+                    post_text = post_text.replace('http','').replace('www.','')
                 db.execute(sa.text("INSERT INTO posts (nickname, name, text, likes, comments) VALUES (:u, :n, :t, '[]', '[]')"),{"u": nickname, "n": user["name"], "t": post_text})
             elif "delete_post" in request.form:
                 pid = request.form["delete_post"]
                 owner = db.execute(sa.text("SELECT nickname FROM posts WHERE id=:id"), {"id": pid}).scalar()
-                if owner == nickname: db.execute(sa.text("DELETE FROM posts WHERE id=:id"), {"id": pid})
+                if owner == nickname or is_admin: db.execute(sa.text("DELETE FROM posts WHERE id=:id"), {"id": pid})
             elif "comment_post_id" in request.form:
                 comment_text = request.form["comment_text"][:700]
                 p = db.execute(sa.text("SELECT comments FROM posts WHERE id=:id"), {"id": request.form["comment_post_id"]}).scalar(); comments = json.loads(p); comments.append({"user": user["name"], "text": comment_text})
@@ -471,13 +532,28 @@ def community(nickname, user):
                 db.execute(sa.text("UPDATE posts SET likes=:l WHERE id=:id"), {"l": json.dumps(likes), "id": request.form["like_post_id"]})
             db.commit(); return redirect("/community")
         posts = db.execute(sa.text("SELECT * FROM posts ORDER BY id DESC")).mappings().all()
-    posts_html = ""
+
+    # PERMANENT NATIVE AD - ALWAYS VISIBLE
+    native_ad_html = f"""
+    <div class="card" style="padding:8px;text-align:center;border:2px dashed #ff9800;background:#fff8e1;position:sticky;top:140px;z-index:10;">
+      <small style="color:#ff9800;font-weight:bold;">📌 Sponsored - Permanent</small>
+      <div style="margin-top:5px;">
+        <script src="{NATIVE_FEED_SRC}"></script>
+      </div>
+    </div>
+    """
+
+    posts_html = native_ad_html
     for p in posts:
         likes_count = len(json.loads(p['likes'])); comments_data = json.loads(p['comments']); comments_html = "".join([f'<div><b>{c["user"]}:</b> {c["text"]}</div>' for c in comments_data]) or '<p>No comments</p>'
-        delete_btn = f"<form method=POST style='display:inline'><input type=hidden name=delete_post value={p['id']}><button class='btn red' style='padding:3px 8px;font-size:0.7rem'>Delete</button></form>" if p['nickname'] == nickname else ""
-        posts_html += f"<div class=card><b>{p['name']}</b>: {p['text']} {delete_btn}<form method=POST><input type=hidden name=like_post_id value={p['id']}><button class=btn.gray>🩷 {likes_count}</button></form>{comments_html}<form method=POST style='display:flex;gap:5px'><input type=hidden name=comment_post_id value={p['id']}><input name=comment_text placeholder='Write comment...' required maxlength=700 style='flex:1'><button class='send-img-btn'><img src='{SEND_BTN_URL}'></button></form></div>"
-    return render_template_string(BASE, title="Community", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>Community</h2><form method=POST><textarea name=post placeholder='Whats on your mind?' required maxlength=1000></textarea><button class='send-img-btn'><img src='{SEND_BTN_URL}'></button><input type=hidden name=new_post value=1></form></div>{posts_html}"), timer_script="")
+        delete_btn = f"<form method=POST style='display:inline'><input type=hidden name=delete_post value={p['id']}><button class='btn red' style='padding:3px 8px;font-size:0.7rem'>Delete</button></form>" if (p['nickname'] == nickname or session.get("admin_logged_in")) else ""
+        # support style
+        support_class = " motiz-support" if p['nickname']=='motiz_support' else ""
+        posts_html += f"<div class=card{support_class}><b>{p['name']}</b> {'<span class=badge>✓ SUPPORT</span>' if p['nickname']=='motiz_support' else ''}: {p['text']} {delete_btn}<form method=POST><input type=hidden name=like_post_id value={p['id']}><button class=btn.gray>🩷 {likes_count}</button></form>{comments_html}<form method=POST style='display:flex;gap:5px'><input type=hidden name=comment_post_id value={p['id']}><input name=comment_text placeholder='Write comment...' required maxlength=700 style='flex:1'><button class='send-img-btn'><img src='{SEND_BTN_URL}'></button></form></div>"
 
+    post_box = "<div class='card'><h2>Community</h2><form method=POST><textarea name=post placeholder='Whats on your mind?' required maxlength=1000></textarea><button class='send-img-btn'><img src='"+SEND_BTN_URL+"'></button><input type=hidden name=new_post value=1></form><p><small>Admin can post images via imgur link. Students text only.</small></p></div>" if True else ""
+
+    return render_template_string(BASE, title="Community", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"{post_box}{posts_html}"), timer_script="")
 @app.route('/me')
 @login_required
 def me(nickname, user):
@@ -486,12 +562,12 @@ def me(nickname, user):
         all_users = db.execute(sa.text("SELECT * FROM users WHERE nickname!=:u"), {"u": nickname}).mappings().all()
 
     incoming_html = "".join([f"<div class=card><b>{r['from_nickname']}</b><form method=POST action=/friends><input type=hidden name=accept_user value={r['from_nickname']}><button class=btn>Accept</button></form></div>" for r in incoming])
-    friends_html = "".join([f"<div class=card>👤 {f}</div>" for f in user['friends']]) or "<p>No friends yet</p>"
-    all_users_html = "".join([f"<div class=card><b>{u['name']}</b><form method=POST action=/friends><input type=hidden name=send_request value={u['nickname']}><button class=btn.blue>Add Friend</button></form></div>" for u in all_users if u['nickname'] not in user['friends']])
+    friends_html = "".join([f"<div class=card>👤 {f} {'<span class=badge>✓ SUPPORT</span>' if f=='motiz_support' else ''}</div>" for f in user['friends']]) or "<p>No friends yet</p>"
+    all_users_html = "".join([f"<div class=card><b>{u['name']}</b><form method=POST action=/friends><input type=hidden name=send_request value={u['nickname']}><button class=btn.blue>Add Friend</button></form></div>" for u in all_users if u['nickname'] not in user['friends'] and u['nickname']!='motiz_support'])
 
-    stats = f"<div class=card><h3>📊 CBT Stats</h3><p><b>Correct:</b> {user['correct']}</p><p><b>Wrong:</b> {user['wrong']}</p><p><b>Lesson Expiry:</b> {user['lesson_expiry']}</p></div>"
+    stats = f"<div class=card><h3>📊 CBT Stats</h3><p><b>Correct:</b> {user['correct']}</p><p><b>Wrong:</b> {user['wrong']}</p><p><b>Lesson Expiry:</b> {user['lesson_expiry']}</p><p><b>Verified:</b> {user['is_verified']}</p></div>"
     ref_link = f"{BASE_URL}/register?ref={nickname}"
-    referral_card = f"""<div class=card><h2>🔗 Referral Program</h2><p>Share your link. When they pay, you get +5 days FREE Lessons + CBT</p><input class=readonly-box readonly value="{ref_link}" onclick="this.select()"><p><b>Friends Referred:</b> {user.get('referral_count',0)}</p><p><b>Free Days Earned:</b> {user.get('free_days',0)}</p></div>"""
+    referral_card = f"""<div class=card><h2>🔗 Referral Program</h2><p>Share your link. When they pay, you get +5 days FREE (30 days plan)</p><input class=readonly-box readonly value="{ref_link}" onclick="this.select()"><p><b>Friends Referred:</b> {user.get('referral_count',0)}</p><p><b>Free Days Earned:</b> {user.get('free_days',0)}</p></div>"""
 
     content = f"<div class=card><h2>My Profile</h2><p><b>Name:</b> {user['name']}</p><p><b>Nickname:</b> @{user['nickname']}</p><p><b>Class:</b> {user['class']} {user.get('dept','')}</p></div>{stats}{referral_card}<div class=card><h2>Friend Requests</h2>{incoming_html or '<p>No requests</p>'}</div><div class=card><h2>My Friends</h2>{friends_html}</div><div class=card><h2>Add Friend</h2>{all_users_html}</div><a class='btn red' href=/logout>🚪 Logout</a>"
     return render_template_string(BASE, title="Me", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
@@ -500,22 +576,43 @@ def me(nickname, user):
 @login_required
 def chat(nickname, user):
     with DBSession() as db:
+        dms_to_me = db.execute(sa.text("SELECT * FROM dms WHERE to_nickname=:u"), {"u": nickname}).mappings().all()
+        for d in dms_to_me:
+            try:
+                delivered = json.loads(d.get('delivered_to','[]') or '[]')
+                if nickname not in delivered:
+                    delivered.append(nickname)
+                    db.execute(sa.text("UPDATE dms SET delivered_to=:d WHERE id=:id"), {"d": json.dumps(delivered), "id": d['id']})
+            except: pass
+        db.commit()
+
         friends_html = ""
         for f in user['friends']:
-            name = db.execute(sa.text("SELECT name FROM users WHERE nickname=:u"), {"u": f}).scalar()
-            initial = name[0].upper() if name else "?"
+            if f == nickname: continue
+            name = db.execute(sa.text("SELECT name, last_seen FROM users WHERE nickname=:u"), {"u": f}).mappings().first()
+            if not name: continue
+            initial = name['name'][0].upper() if name['name'] else "?"
             dms = db.execute(sa.text("SELECT * FROM dms WHERE to_nickname=:u AND from_nickname=:f"), {"u": nickname, "f": f}).mappings().all()
-            unread = len([d for d in dms if nickname not in json.loads(d.get('read_by','[]'))])
-            bell = f'<span class=notification>🔔</span>' if unread > 0 else ''
-            friends_html += f"<a class=friend-card href=/dm/{f} style='position:relative'>{bell}<div class=friend-avatar>{initial}</div><div style='flex:1'><b>{name}</b></div></a>"
+            unread = len([d for d in dms if nickname not in json.loads(d.get('read_by','[]') or '[]')])
+            bell = f'<span class=notification>🔔{unread}</span>' if unread > 0 else ''
+            try:
+                ls = name['last_seen']
+                if ls:
+                    diff = datetime.now(pytz.utc) - ls if ls.tzinfo else datetime.now() - ls
+                    if diff.total_seconds() < 300: ls_text = "<small style='color:green'>● Online now</small>"
+                    else: ls_text = f"<small>Last seen {int(diff.total_seconds()//60)}m ago</small>"
+                else: ls_text = ""
+            except: ls_text = ""
+            badge = '<span class=badge>✓ SUPPORT</span>' if f=='motiz_support' else ''
+            friends_html += f"<a class=friend-card href=/dm/{f} style='position:relative'>{bell}<div class=friend-avatar>{initial}</div><div style='flex:1'><b>{name['name']}</b> {badge}<br>{ls_text}</div></a>"
 
         my_groups = db.execute(sa.text("SELECT * FROM groups")).mappings().all()
         groups_html = ""
         for g in my_groups:
-            if nickname in json.loads(g['members']):
-                messages = json.loads(g['messages'])
+            if nickname in json.loads(g['members'] or '[]'):
+                messages = json.loads(g['messages'] or '[]')
                 unread = len([m for m in messages if nickname not in m.get('read_by',[])])
-                bell = f'<span class=notification>🔔</span>' if unread > 0 else ''
+                bell = f'<span class=notification>🔔{unread}</span>' if unread > 0 else ''
                 groups_html += f"<a class=friend-card href=/group/{g['id']} style='position:relative'>{bell}<div class=friend-avatar>👥</div><div style='flex:1'><b>{g['name']}</b></div></a>"
 
     content = f"<div class=card><h2>DM - My Friends</h2>{friends_html or '<p>Add friends to start chat</p>'}</div><div class=card><h2>Groups</h2>{groups_html or '<p>No groups yet</p>'}<form method=POST action=/groups><input name=group_name placeholder='Create Group Name' required><button name=create_group class=btn.blue>Create Group</button></form></div>"
@@ -527,7 +624,9 @@ def friends(nickname, user):
     with DBSession() as db:
         if request.method=="POST":
             if "send_request" in request.form:
-                db.execute(sa.text("INSERT INTO friend_requests (from_nickname, to_nickname) VALUES (:f, :t)"), {"f": nickname, "t": request.form["send_request"]}); db.commit()
+                exists = db.execute(sa.text("SELECT id FROM friend_requests WHERE from_nickname=:f AND to_nickname=:t AND status='Pending'"), {"f": nickname, "t": request.form["send_request"]}).scalar()
+                if not exists:
+                    db.execute(sa.text("INSERT INTO friend_requests (from_nickname, to_nickname) VALUES (:f, :t)"), {"f": nickname, "t": request.form["send_request"]}); db.commit()
             elif "accept_user" in request.form:
                 from_user = request.form["accept_user"];
                 if from_user not in user['friends']: user['friends'].append(from_user)
@@ -545,37 +644,63 @@ def dm_chat(nickname, user, to_nickname):
     with DBSession() as db:
         if request.method=="POST":
             msg_text = request.form["msg"][:700]
-            db.execute(sa.text("INSERT INTO dms (from_nickname, to_nickname, text, time, read_by) VALUES (:f, :t, :txt, :time, :r)"),
-                       {"f": nickname, "t": to_nickname, "txt": msg_text, "time": datetime.now(NIGERIA_TZ).strftime("%I:%M %p"), "r": json.dumps([nickname])})
+            db.execute(sa.text("INSERT INTO dms (from_nickname, to_nickname, text, time, read_by, delivered_to) VALUES (:f, :t, :txt, :time, :r, :d)"),
+                       {"f": nickname, "t": to_nickname, "txt": msg_text, "time": datetime.now(NIGERIA_TZ).strftime("%I:%M %p"), "r": json.dumps([nickname]), "d": json.dumps([])})
             db.commit(); return redirect(f"/dm/{to_nickname}")
         chat = db.execute(sa.text("SELECT * FROM dms WHERE (from_nickname=:u AND to_nickname=:t) OR (from_nickname=:t AND to_nickname=:u) ORDER BY id"),{"u": nickname, "t": to_nickname}).mappings().all()
         for m in chat:
             if m['to_nickname'] == nickname:
-                try: read_list = json.loads(m.get('read_by','[]'))
-                except: read_list = []
-                if nickname not in read_list:
-                    read_list.append(nickname)
-                    db.execute(sa.text("UPDATE dms SET read_by=:r WHERE id=:id"), {"r": json.dumps(read_list), "id": m['id']})
+                try:
+                    read_list = json.loads(m.get('read_by','[]') or '[]')
+                    delivered_list = json.loads(m.get('delivered_to','[]') or '[]')
+                    updated = False
+                    if nickname not in delivered_list: delivered_list.append(nickname); updated=True
+                    if nickname not in read_list: read_list.append(nickname); updated=True
+                    if updated:
+                        db.execute(sa.text("UPDATE dms SET read_by=:r, delivered_to=:d WHERE id=:id"), {"r": json.dumps(read_list), "d": json.dumps(delivered_list), "id": m['id']})
+                except: pass
         db.commit()
-        to_name = db.execute(sa.text("SELECT name FROM users WHERE nickname=:u"), {"u": to_nickname}).scalar()
+        to_user = db.execute(sa.text("SELECT name, last_seen FROM users WHERE nickname=:u"), {"u": to_nickname}).mappings().first()
+        to_name = to_user['name'] if to_user else to_nickname
+        try:
+            ls = to_user['last_seen'] if to_user else None
+            if ls:
+                diff = datetime.now(pytz.utc) - ls if ls.tzinfo else datetime.now() - ls
+                if diff.total_seconds() < 300: ls_header = "● Online now"
+                else:
+                    mins = int(diff.total_seconds()//60)
+                    if mins < 60: ls_header = f"Last seen {mins}m ago"
+                    else: ls_header = f"Last seen {mins//60}h ago"
+            else: ls_header = ""
+        except: ls_header = ""
 
     msgs = ""
     for m in chat:
-        initial = m['from_nickname'][0].upper()
-        time_html = f"<span class=bubble-time>{m['time']}</span>"
+        read_by = json.loads(m.get('read_by','[]') or '[]')
+        delivered_to = json.loads(m.get('delivered_to','[]') or '[]')
+        if m['from_nickname']==nickname:
+            if to_nickname in read_by: tick = "<span style='color:#1DA1F2'>✓✓ Seen</span>"
+            elif to_nickname in delivered_to: tick = "<span>✓✓ Delivered</span>"
+            else: tick = "<span>✓ Sent</span>"
+        else: tick = ""
+        time_html = f"<span class=bubble-time>{m['time']} {tick}</span>"
         if m['from_nickname']==nickname:
             msgs += f"<div class='chat-msg me'><div class='bubble me'><span class=bubble-text>{m['text']}</span>{time_html}</div></div>"
         else:
-            msgs += f"<div class='chat-msg other'><div class=chat-avatar>{initial}</div><div class='bubble other'><b>{m['from_nickname']}</b><span class=bubble-text>{m['text']}</span>{time_html}</div></div>"
+            support_cls = " motiz-support" if m['from_nickname']=='motiz_support' else ""
+            badge = " <span class=badge>✓ SUPPORT</span>" if m['from_nickname']=='motiz_support' else ""
+            msgs += f"<div class='chat-msg other'><div class=chat-avatar>{m['from_nickname'][0].upper()}</div><div class='bubble other{support_cls}'><b>{m['from_nickname']}{badge}</b><span class=bubble-text>{m['text']}</span>{time_html}</div></div>"
 
-    content = f"<div class=card><div class=chat-box>{msgs or '<p style=text-align:center;color:gray>No messages yet</p>'}</div></div><form method=POST class=chat-input-fixed><input name=msg placeholder='Type message...' required maxlength=700 style='flex:1'><button class='send-img-btn'><img src='{SEND_BTN_URL}'></button></form>"
+    content = f"<div class=card><b>{to_name}</b> {('<span class=badge>✓ SUPPORT</span>' if to_nickname=='motiz_support' else '')}<br><small>{ls_header}</small></div><div class=card><div class=chat-box>{msgs or '<p style=text-align:center;color:gray>No messages yet</p>'}</div></div><form method=POST class=chat-input-fixed><input name=msg placeholder='Type message...' required maxlength=700 style='flex:1'><button class='send-img-btn'><img src='{SEND_BTN_URL}'></button></form>"
     return render_template_string(BASE, title=f"Chat with {to_name}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
+
 @app.route('/groups', methods=["GET","POST"])
 @login_required
 def groups(nickname, user):
     with DBSession() as db:
         if request.method=="POST":
             if "create_group" in request.form:
+                if nickname=='motiz_support': return redirect("/chat")
                 db.execute(sa.text("INSERT INTO groups (name, creator, members, messages) VALUES (:n, :c, :m, :msg)"),
                            {"n": request.form["group_name"], "c": nickname, "m": json.dumps([nickname]), "msg": json.dumps([])})
                 db.commit()
@@ -587,8 +712,8 @@ def groups(nickname, user):
 def group_chat(nickname, user, gid):
     with DBSession() as db:
         group = db.execute(sa.text("SELECT * FROM groups WHERE id=:id"), {"id": gid}).mappings().first()
-        if not group or nickname not in json.loads(group['members']): return redirect("/chat")
-        members = json.loads(group['members']); messages = json.loads(group['messages']); is_creator = group['creator']==nickname
+        if not group or nickname not in json.loads(group['members'] or '[]'): return redirect("/chat")
+        members = json.loads(group['members'] or '[]'); messages = json.loads(group['messages'] or '[]'); is_creator = group['creator']==nickname
         if request.method=="POST":
             if "send_msg" in request.form:
                 msg_text = request.form["msg"][:700]
@@ -596,8 +721,9 @@ def group_chat(nickname, user, gid):
                 db.execute(sa.text("UPDATE groups SET messages=:m WHERE id=:id"), {"m": json.dumps(messages), "id": gid})
             elif "add_member" in request.form and is_creator:
                 new_member = request.form["add_member"]
-                if new_member not in members: members.append(new_member)
-                db.execute(sa.text("UPDATE groups SET members=:m WHERE id=:id"), {"m": json.dumps(members), "id": gid})
+                if new_member not in members and new_member!='motiz_support':
+                    members.append(new_member)
+                    db.execute(sa.text("UPDATE groups SET members=:m WHERE id=:id"), {"m": json.dumps(members), "id": gid})
             elif "remove_member" in request.form and is_creator:
                 rem_member = request.form["remove_member"]
                 if rem_member in members and rem_member!= group['creator']: members.remove(rem_member)
@@ -608,7 +734,6 @@ def group_chat(nickname, user, gid):
             if 'read_by' not in m: m['read_by'] = []
             if nickname not in m['read_by']: m['read_by'].append(nickname); updated = True
         if updated: db.execute(sa.text("UPDATE groups SET messages=:m WHERE id=:id"), {"m": json.dumps(messages), "id": gid}); db.commit()
-
         msgs = ""
         for m in messages:
             time_html = f"<span class=bubble-time>{m['time']}</span>"
@@ -617,10 +742,9 @@ def group_chat(nickname, user, gid):
             else:
                 initial = m['user'][0].upper()
                 msgs += f"<div class='chat-msg other'><div class=chat-avatar>{initial}</div><div class='bubble other'><b>{m['user']}</b><span class=bubble-text>{m['text']}</span>{time_html}</div></div>"
-
         member_manage = ""
         if is_creator:
-            all_users = db.execute(sa.text("SELECT nickname, name FROM users")).mappings().all()
+            all_users = db.execute(sa.text("SELECT nickname, name FROM users WHERE nickname!='motiz_support'")).mappings().all()
             add_options = "".join([f"<option value='{u['nickname']}'>{u['name']}</option>" for u in all_users if u['nickname'] not in members])
             remove_options = "".join([f"<option value='{u}'>{u}</option>" for u in members if u!= group['creator']])
             member_manage = f"<div class=card><h3>Manage Members</h3><form method=POST style='display:flex;gap:5px'><select name=add_member>{add_options}</select><button class=btn.blue>Add</button></form><form method=POST style='display:flex;gap:5px'><select name=remove_member>{remove_options}</select><button class='btn red'>Remove</button></form></div>"
@@ -646,19 +770,25 @@ def admin(nickname, user):
 
     if request.method=="POST":
         with DBSession() as db:
-            # FIXED: NOW SETS is_verified=TRUE FOR QUESTIONS TOO
             if "verify_id" in request.form:
                 req = db.execute(sa.text("SELECT * FROM payments WHERE id=:id"), {"id": request.form["verify_id"]}).mappings().first()
                 if req["type"] == "questions":
                     db.execute(sa.text("UPDATE users SET q_cycle='paid', is_verified=TRUE, payment_verified_date=:today WHERE nickname=:u"), {"today": str(date.today()), "u": req["nickname"]})
                 if req["type"] == "lessons":
-                    db.execute(sa.text("UPDATE users SET lesson_expiry=:d, is_verified=TRUE, payment_verified_date=:today WHERE nickname=:u"), {"d": str(date.today() + timedelta(days=15)), "today": str(date.today()), "u": req["nickname"]})
+                    db.execute(sa.text("UPDATE users SET lesson_expiry=:d, is_verified=TRUE, payment_verified_date=:today WHERE nickname=:u"), {"d": str(date.today() + timedelta(days=30)), "today": str(date.today()), "u": req["nickname"]})
                 ref = db.execute(sa.text("SELECT referred_by FROM users WHERE nickname=:u"), {"u": req["nickname"]}).scalar()
                 if ref:
-                    db.execute(sa.text("UPDATE users SET free_days=free_days+5 WHERE nickname=:r"), {"r": ref})
-                    db.execute(sa.text("UPDATE users SET referral_count=referral_count+1 WHERE nickname=:r"), {"r": ref})
+                    ref_user = db.execute(sa.text("SELECT lesson_expiry FROM users WHERE nickname=:r"), {"r": ref}).scalar()
+                    try:
+                        if ref_user:
+                            current_expiry = datetime.strptime(str(ref_user), "%Y-%m-%d").date()
+                            if current_expiry < date.today(): current_expiry = date.today()
+                        else: current_expiry = date.today()
+                        new_expiry = current_expiry + timedelta(days=5)
+                    except: new_expiry = date.today() + timedelta(days=5)
+                    db.execute(sa.text("UPDATE users SET lesson_expiry=:d, free_days=free_days+5, referral_count=referral_count+1 WHERE nickname=:r"), {"d": str(new_expiry), "r": ref})
                 db.execute(sa.text("UPDATE payments SET status='Verified' WHERE id=:id"), {"id": request.form["verify_id"]})
-                db.commit(); error = "<div class=success>Payment Verified + Student Unlocked for 1 Month</div>"
+                db.commit(); error = "<div class=success>Payment Verified - 30 Days + Referral +5 Days</div>"
 
             if "deny_id" in request.form:
                 db.execute(sa.text("UPDATE payments SET status='Denied' WHERE id=:id"), {"id": request.form["deny_id"]}); db.commit(); error = "<div class=error>Payment Denied</div>"
@@ -669,7 +799,6 @@ def admin(nickname, user):
                 correct_ans = options[int(request.form["correct_ans"])]
                 db.execute(sa.text("INSERT INTO questions (key, q, options, ans) VALUES (:k, :q, :o, :a)"),{"k": key, "q": request.form["q"], "o": json.dumps(options), "a": correct_ans}); db.commit(); error = f"<div class=success>Question Added for {key}</div>"
 
-            # FIXED BULK UPLOAD: USES CSV READER
             if "bulk_upload" in request.form:
                 key = f"{request.form['bulk_key']}_{request.form['bulk_subject']}"
                 data = request.form['bulk_data'].strip()
@@ -678,13 +807,12 @@ def admin(nickname, user):
                 success = 0; failed = []
                 for i, parts in enumerate(reader, 1):
                     try:
-                        if len(parts)!= 6: raise Exception("Need 6 columns: Question,A,B,C,D,CorrectAnswer")
+                        if len(parts)!= 6: raise Exception("Need 6 columns")
                         q, a, b, c, d, ans = [x.strip() for x in parts]
                         options = [a,b,c,d]
                         db.execute(sa.text("INSERT INTO questions (key, q, options, ans) VALUES (:k, :q, :o, :a)"),{"k": key, "q": q, "o": json.dumps(options), "a": ans})
                         success += 1
-                    except Exception as e:
-                        failed.append(f"Line {i}: {str(e)}")
+                    except Exception as e: failed.append(f"Line {i}: {str(e)}")
                 db.commit()
                 bulk_result = f"<div class=success>✅ {success} Questions Added</div>"
                 if failed: bulk_result += f"<div class=error>❌ Failed: {' | '.join(failed)}</div>"
@@ -692,8 +820,7 @@ def admin(nickname, user):
             if "add_lesson" in request.form:
                 full_key = request.form['l_key']
                 parts = full_key.split("_")
-                cls = parts[0]
-                dept = parts[1] if len(parts) > 1 else ""
+                cls = parts[0]; dept = parts[1] if len(parts) > 1 else ""
                 db.execute(sa.text("INSERT INTO lessons (class, dept, subject, title, notes, date, media_link) VALUES (:c, :d, :s, :t, :n, :date, :m)"),
                            {"c": cls, "d": dept, "s": request.form['lesson_subject'], "t": request.form['lesson_title'], "n": request.form['lesson_notes'], "date": str(date.today()), "m": request.form.get('media_link','')}); db.commit(); error = "<div class=success>Lesson Posted</div>"
 
@@ -709,21 +836,18 @@ def admin(nickname, user):
                 db.execute(sa.text("DELETE FROM lessons WHERE id=:id"), {"id": request.form["lid"]}); db.commit(); error = "<div class=error>Lesson Deleted</div>"
 
             if "clear_all_data" in request.form:
-                db.execute(sa.text("DELETE FROM questions"))
-                db.execute(sa.text("DELETE FROM lessons"))
-                db.execute(sa.text("DELETE FROM payments"))
-                db.commit(); error = "<div class=error>⚠️ All Old Questions, Lessons, Payments Deleted</div>"
+                db.execute(sa.text("DELETE FROM questions")); db.execute(sa.text("DELETE FROM lessons")); db.execute(sa.text("DELETE FROM payments")); db.commit(); error = "<div class=error>⚠️ All Old Data Deleted</div>"
 
             if "change_pass" in request.form:
-                if request.form["old_pass"]!= ADMIN_PASS: error = "<div class=error>Old password is wrong</div>"
-                else: ADMIN_PASS = request.form["new_pass"]; set_setting("admin_pass", ADMIN_PASS); error = "<div class=success>Admin Password Changed</div>"
+                if request.form["old_pass"]!= ADMIN_PASS: error = "<div class=error>Old password wrong</div>"
+                else: ADMIN_PASS = request.form["new_pass"]; set_setting("admin_pass", ADMIN_PASS); error = "<div class=success>Password Changed</div>"
 
             if "post_notice" in request.form:
                 NOTICES.insert(0, {"title": request.form["notice_title"], "text": request.form["notice_text"], "media_link": request.form.get("media_link",""), "created_at": str(datetime.now(NIGERIA_TZ))})
                 set_setting("notices", json.dumps(NOTICES)); error = "<div class=success>Notice Posted</div>"
 
     with DBSession() as db: pending_reqs = db.execute(sa.text("SELECT * FROM payments WHERE status='Pending'")).mappings().all()
-    pending_html = "".join([f"<div class='card'><b>{r['name']}</b> for {r['type']}<br><small>Bank: {r.get('bank_used','N/A')} | Acc: {r.get('account_name','N/A')}</small><div style='display:flex;gap:5px'><form method=POST style='flex:1'><input type=hidden name=verify_id value={r['id']}><button class=btn>Verify</button></form><form method=POST style='flex:1'><input type=hidden name=deny_id value={r['id']}><button class='btn red'>Deny</button></form></div></div>" for r in pending_reqs])
+    pending_html = "".join([f"<div class='card'><b>{r['name']}</b> for {r['type']}<br><small>Bank: {r.get('bank_used','N/A')} | Acc: {r.get('account_name','N/A')}</small><div style='display:flex;gap:5px'><form method=POST style='flex:1'><input type=hidden name=verify_id value={r['id']}><button class=btn>Verify 30 Days</button></form><form method=POST style='flex:1'><input type=hidden name=deny_id value={r['id']}><button class='btn red'>Deny</button></form></div></div>" for r in pending_reqs])
 
     keys = ["JSS1","JSS2","JSS3","SS1_Science","SS1_Commercial","SS1_Art","SS2_Science","SS2_Commercial","SS2_Art","SS3_Science","SS3_Commercial","SS3_Art"]
     labels = ["JSS1","JSS2","JSS3","SS1 Science","SS1 Commercial","SS1 Art","SS2 Science","SS2 Commercial","SS2 Art","SS3 Science","SS3 Commercial","SS3 Art"]
@@ -740,13 +864,13 @@ def admin(nickname, user):
         sub_options = "".join([f"<option>{s}</option>" for s in subs])
         add_q_form = f"<div class=card><h3>Add Question for {q_target.replace('_',' ')}</h3><form method=POST><input type=hidden name=q_key value='{q_target}'><select name=admin_subject required><option value=''>Select Subject</option>{sub_options}</select><textarea name=q placeholder='Question' required></textarea><input name=a placeholder='Option A' required><input name=b placeholder='Option B' required><input name=c placeholder='Option C' required><input name=d placeholder='Option D' required><select name=correct_ans required><option value=0>A</option><option value=1>B</option><option value=2>C</option><option value=3>D</option></select><button name=add_question class='send-img-btn'><img src='{SEND_BTN_URL}'></button></form></div>"
         if request.args.get('bulk'):
-            bulk_form = f"<div class=card><h3>📦 Bulk Upload for {q_target.replace('_',' ')}</h3>{bulk_result}<form method=POST><input type=hidden name=bulk_key value='{q_target}'><select name=bulk_subject required><option value=''>Select Subject</option>{sub_options}</select><textarea name=bulk_data placeholder='Paste CSV: Question,A,B,C,D,CorrectAnswer' rows=10 required></textarea><button name=bulk_upload class=btn.orange>Upload 20/50 Questions</button></form></div>"
+            bulk_form = f"<div class=card><h3>📦 Bulk Upload for {q_target.replace('_',' ')}</h3>{bulk_result}<form method=POST><input type=hidden name=bulk_key value='{q_target}'><select name=bulk_subject required><option value=''>Select Subject</option>{sub_options}</select><textarea name=bulk_data placeholder='Paste CSV: Question,A,B,C,D,CorrectAnswer' rows=10 required></textarea><button name=bulk_upload class=btn.orange>Upload</button></form></div>"
 
     add_l_form = ""
     if l_target:
         subs = SUBJECTS.get(l_target, [])
         sub_options = "".join([f"<option>{s}</option>" for s in subs])
-        add_l_form = f"<div class=card><h3>Add Lesson for {l_target.replace('_',' ')}</h3><form method=POST><input type=hidden name=l_key value='{l_target}'><select name=lesson_subject required><option value=''>Select Subject</option>{sub_options}</select><input name=lesson_title placeholder='Lesson Title' required><textarea name=lesson_notes placeholder='Lesson Notes' rows=6 required></textarea><input name=media_link placeholder='Image/Video Imgur Link.jpg.mp4 optional'><button name=add_lesson class='send-img-btn'><img src='{SEND_BTN_URL}'></button></form></div>"
+        add_l_form = f"<div class=card><h3>Add Lesson for {l_target.replace('_',' ')}</h3><form method=POST><input type=hidden name=l_key value='{l_target}'><select name=lesson_subject required><option value=''>Select Subject</option>{sub_options}</select><input name=lesson_title placeholder='Lesson Title' required><textarea name=lesson_notes placeholder='Lesson Notes' rows=6 required></textarea><input name=media_link placeholder='Image/Video Link.jpg.mp4 optional'><button name=add_lesson class='send-img-btn'><img src='{SEND_BTN_URL}'></button></form></div>"
 
     manage_html = ""
     if manage == "questions":
@@ -755,23 +879,22 @@ def admin(nickname, user):
         for q in questions:
             opts = json.loads(q['options'])
             q_list += f"<div class=card><b>{q['key']}</b><p>{q['q']}</p><p><small>A:{opts[0]} B:{opts[1]} C:{opts[2]} D:{opts[3]} | Ans:{q['ans']}</small></p><form method=POST><input type=hidden name=qid value={q['id']}><input name=q value='{q['q']}'><input name=a value='{opts[0]}'><input name=b value='{opts[1]}'><input name=c value='{opts[2]}'><input name=d value='{opts[3]}'><select name=correct_ans><option value=0 {'selected' if q['ans']==opts[0] else ''}>A</option><option value=1 {'selected' if q['ans']==opts[1] else ''}>B</option><option value=2 {'selected' if q['ans']==opts[2] else ''}>C</option><option value=3 {'selected' if q['ans']==opts[3] else ''}>D</option></select><button name=edit_question class=btn.blue>Edit</button></form><form method=POST><input type=hidden name=qid value={q['id']}><button name=delete_question class='btn red'>Delete</button></form></div>"
-        manage_html = f"<div class=card><h2>📝 Manage CBT Questions</h2>{q_list or '<p>No questions yet</p>'}</div>"
+        manage_html = f"<div class=card><h2>📝 Manage Questions</h2>{q_list or '<p>No questions</p>'}</div>"
     elif manage == "lessons":
         with DBSession() as db: lessons = db.execute(sa.text("SELECT * FROM lessons ORDER BY id DESC")).mappings().all()
         l_list = ""
         for l in lessons:
             l_list += f"<div class=card><b>{l['class']} {l['dept']} - {l['subject']}</b><p>{l['title']}</p><form method=POST><input type=hidden name=lid value={l['id']}><input name=lesson_title value='{l['title']}'><textarea name=lesson_notes>{l['notes']}</textarea><input name=media_link value='{l.get('media_link','')}'><button name=edit_lesson class=btn.blue>Edit</button></form><form method=POST><input type=hidden name=lid value={l['id']}><button name=delete_lesson class='btn red'>Delete</button></form></div>"
-        manage_html = f"<div class=card><h2>📚 Manage Lessons</h2>{l_list or '<p>No lessons yet</p>'}</div>"
+        manage_html = f"<div class=card><h2>📚 Manage Lessons</h2>{l_list or '<p>No lessons</p>'}</div>"
 
-    form = f'\
-<div class="card"><h2>Admin Panel</h2>{error}{bulk_result}</div>\
-{add_q_form}{bulk_form}{add_l_form}{manage_html}\
-<div class="card"><h2>📝 GROUP 1: CBT - ADD QUESTIONS</h2><div style="display:flex;flex-direction:column;gap:10px">{group1}</div></div>\
-<div class="card"><h2>🎓 GROUP 2: LESSONS - POST LESSONS</h2><div style="display:flex;flex-direction:column;gap:10px">{group2}</div></div>\
-<div class="card"><h2>⚙️ GROUP 3: MANAGE CONTENT</h2><a href=/admin?manage=questions class=btn.blue>Manage CBT Questions</a><a href=/admin?manage=lessons class=btn.blue>Manage Lessons</a></div>\
-<div class="card"><h2>👥 GROUP 4: STUDENT MANAGEMENT</h2><h3>Confirm Payment</h3>{pending_html or "<p>No pending payments</p>"}<a href=/admin_attendance class=btn.blue>View Attendance</a><form method=POST><h3>Post Notice</h3><input name=notice_title placeholder="Notice Title" required><textarea name=notice_text placeholder="Notice Message" required></textarea><input name=media_link placeholder="Image/Video Imgur Link optional"><button name=post_notice class="send-img-btn"><img src="{SEND_BTN_URL}"></button></form></div>\
-<div class="card"><h2>🛑 DANGER ZONE</h2><form method=POST onsubmit="return confirm(\'Delete ALL questions, lessons and payments?\')"><button name=clear_all_data class="btn red">Clear All Old Data</button></form></div>\
-<div class="card"><h2>🔒 GROUP 5: ADMIN SETTINGS</h2><h3>Change Admin Password</h3><form method="POST"><input type="password" name="old_pass" placeholder="Current Password" required><input type="password" name="new_pass" placeholder="New Password" required><button name="change_pass" class="btn orange">Change Password</button></form></div>'
+    form = f"""<div class="card"><h2>Admin Panel V31 - 30 Days</h2>{error}{bulk_result}</div>
+{add_q_form}{bulk_form}{add_l_form}{manage_html}
+<div class="card"><h2>📝 GROUP 1: CBT QUESTIONS</h2><div style="display:flex;flex-direction:column;gap:10px">{group1}</div></div>
+<div class="card"><h2>🎓 GROUP 2: LESSONS</h2><div style="display:flex;flex-direction:column;gap:10px">{group2}</div></div>
+<div class="card"><h2>⚙️ GROUP 3: MANAGE</h2><a href=/admin?manage=questions class=btn.blue>Manage Questions</a><a href=/admin?manage=lessons class=btn.blue>Manage Lessons</a></div>
+<div class="card"><h2>👥 GROUP 4: STUDENTS</h2><h3>Confirm Payment - 30 Days</h3>{pending_html or "<p>No pending</p>"}<a href=/admin_attendance class=btn.blue>View Attendance + Last Seen</a><form method=POST><h3>Post Notice</h3><input name=notice_title placeholder="Notice Title" required><textarea name=notice_text placeholder="Message" required></textarea><input name=media_link placeholder="Imgur Link optional"><button name=post_notice class="send-img-btn"><img src="{SEND_BTN_URL}"></button></form></div>
+<div class="card"><h2>🛑 DANGER ZONE</h2><form method=POST onsubmit="return confirm('Delete ALL?')"><button name=clear_all_data class="btn red">Clear All Old Data</button></form></div>
+<div class="card"><h2>🔒 GROUP 5: ADMIN SETTINGS</h2><form method="POST"><input type="password" name="old_pass" placeholder="Current Password" required><input type="password" name="new_pass" placeholder="New Password" required><button name="change_pass" class="btn orange">Change Password</button></form></div>"""
     return render_template_string(BASE, title="Admin", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(form), timer_script="")
 
 @app.route('/admin_attendance')
@@ -779,9 +902,23 @@ def admin(nickname, user):
 def admin_attendance(nickname, user):
     if not session.get("admin_logged_in"): return redirect("/admin")
     with DBSession() as db:
-        users = db.execute(sa.text("SELECT name, class, dept, q_used, lesson_expiry, is_verified FROM users ORDER BY class")).mappings().all()
-    table = "".join([f"<tr><td>{u['name']}</td><td>{u['class']} {u.get('dept','')}</td><td>{u['q_used']}</td><td>{'Verified' if u['is_verified'] else 'Free'}</td><td>{u['lesson_expiry']}</td></tr>" for u in users])
-    content = f"<div class=card><h2>View Attendance</h2><table style='width:100%;font-size:0.8rem'><tr><th>Name</th><th>Class</th><th>Q Used</th><th>Status</th><th>Lesson Expiry</th></tr>{table}</table></div>"
+        users = db.execute(sa.text("SELECT name, nickname, class, dept, q_used, lesson_expiry, is_verified, last_seen, referral_count FROM users WHERE nickname!='motiz_support' ORDER BY last_seen DESC NULLS LAST")).mappings().all()
+    table = ""
+    for u in users:
+        try:
+            ls = u['last_seen']
+            if ls:
+                diff = datetime.now(pytz.utc) - ls if ls.tzinfo else datetime.now() - ls
+                if diff.total_seconds() < 300: ls_text = "<span style='color:green;font-weight:bold'>● Online now</span>"
+                else:
+                    mins = int(diff.total_seconds()//60)
+                    if mins < 60: ls_text = f"{mins}m ago"
+                    elif mins < 1440: ls_text = f"{mins//60}h ago"
+                    else: ls_text = f"{mins//1440}d ago"
+            else: ls_text = "Never"
+        except: ls_text = "Unknown"
+        table += f"<tr><td>{u['name']}<br><small>@{u['nickname']}</small></td><td>{u['class']} {u.get('dept','') or ''}</td><td>{u['q_used']}</td><td>{'Verified' if u['is_verified'] else 'Free'}</td><td>{u['lesson_expiry'] or 'None'}</td><td>{ls_text}</td><td>{u['referral_count'] or 0}</td></tr>"
+    content = f"<div class=card><h2>View Attendance + Last Seen - V31</h2><p>Total Students: {len(users)}</p><div style='overflow-x:auto'><table style='width:100%;font-size:0.75rem;border-collapse:collapse' border=1><tr><th>Name</th><th>Class</th><th>Q Used</th><th>Status</th><th>Lesson Expiry</th><th>Last Seen</th><th>Referrals</th></tr>{table}</table></div><a class=btn.blue href=/admin>Back to Admin</a></div>"
     return render_template_string(BASE, title="Attendance", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
 if __name__ == '__main__':
