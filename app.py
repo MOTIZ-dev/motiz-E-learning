@@ -663,7 +663,7 @@ def me_page(nickname, user):
             html+=f"<div class=friend-card><div class=friend-avatar>{u['nickname'][0].upper()}</div><div style='flex:1'><b>{u['name']}</b><br><small>{u['nickname']} - {u['class']}</small></div><a class=btn.blue href=/add_friend/{u['nickname']}?offset={offset} style='width:auto;padding:8px 15px'>Add</a></div>"
         next_offset = offset + FRIENDS_BATCH
         if next_offset < len(filtered):
-            html+=f"<a class=btn orange href=/me?offset={next_offset}>🔍 Scout - Show Next 5</a>"
+            html+=f"<a class='btn orange' href=/me?offset={next_offset}>🔍 Scout - Show Next 5</a>"
         else:
             html+=f"<a class=btn.gray href=/me?offset=0>🔄 Scout Again From Start</a>"
         html+=f"<a class=btn.red href=/logout>Logout</a><a class=btn.blue href=/chat>Back to Chat</a>"
