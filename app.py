@@ -792,7 +792,6 @@ def dm_page(nickname, user, other):
         other_user = db.execute(sa.text("SELECT * FROM users WHERE nickname=:o"), {"o": other}).mappings().first()
         if not other_user: return redirect("/chat")
 
-        # DELETE MESSAGE
         del_id = request.args.get('del_msg')
         if del_id:
             msg = db.execute(sa.text("SELECT from_nickname FROM dms WHERE id=:i"), {"i": int(del_id)}).scalar()
@@ -817,7 +816,7 @@ def dm_page(nickname, user, other):
         if request.method=="POST" and request.form.get("text"):
             txt = request.form["text"][:700]
             reply_to = request.form.get("reply_to","")[:200]
-            full_text = f"↩️ Reply to: {reply_to}\n{txt}" if reply_to else txt
+            full_text = f"Reply to: {reply_to} | {txt}" if reply_to else txt
             db.execute(sa.text("INSERT INTO dms (from_nickname, to_nickname, text, time) VALUES (:f,:t,:txt,:tm)"), {"f": nickname, "t": other, "txt": full_text, "tm": str(datetime.now(NIGERIA_TZ))})
             db.commit()
             return redirect(f"/dm/{other}")
@@ -842,15 +841,19 @@ def dm_page(nickname, user, other):
             tick = ""
         cls = "me" if is_me else "other"
         t12 = format_12h(m['time'])
-        # Format reply
-        text_display = m['text'].replace("\n","<br>")
-        if "↩️ Reply to:" in m['text']:
-            parts = m['text'].split("\n",1)
-            text_display = f"<div style='background:rgba(0,0,0,0.1);padding:5px;border-radius:5px;margin-bottom:5px;font-size:0.8rem;border-left:3px solid #0f3460'>{parts[0]}</div>{parts[1] if len(parts)>1 else ''}"
+        # FIXED: No backslash in f-string
+        safe_text = m['text'].replace("\n", "<br>")
+        raw_snippet = m['text'][:80].replace("'", "").replace('"', "").replace("\n", " ")
+        bubble_class = "me bubble" if is_me else "other bubble"
+        chat_msg_class = "chat-msg me" if is_me else "chat-msg other"
+        # reply formatting
+        if "Reply to:" in m['text']:
+            parts = m['text'].split("|", 1)
+            reply_part = parts[0] if len(parts) > 0 else ""
+            main_part = parts[1] if len(parts) > 1 else m['text']
+            safe_text = f"<div style='background:rgba(0,0,0,0.15);padding:5px;border-radius:5px;margin-bottom:5px;font-size:0.8rem;border-left:3px solid #0f3460'>{reply_part}</div>{main_part}"
 
-        # WHATSAPP LIKE: Long press menu for delete/reply/copy
-        chat_html+=f"""<div class='chat-msg {cls}' oncontextmenu="showMenu(event,{m['id']},'{m['text'][:100].replace("'','').replace('\"','')}'); return false;" onclick="showMenu(event,{m['id']},'{m['text'][:100].replace("'','').replace('\"','')}')">
-        <div class='bubble {cls}' id='msg-{m['id']}'><div class='bubble-text'>{text_display}</div><div class='bubble-time'>{t12} {tick}</div></div></div>"""
+        chat_html += f"<div class='{chat_msg_class}' onclick=\"showMenu(event,{m['id']},'{raw_snippet}')\"><div class='{bubble_class}'><div>{safe_text}</div><div class='bubble-time'>{t12} {tick}</div></div></div>"
 
     timer_js = Markup(f"""
     setTimeout(()=>{{ window.scrollTo(0, document.body.scrollHeight); }}, 300);
@@ -863,7 +866,6 @@ def dm_page(nickname, user, other):
                     let o = ctx.createOscillator(); let g = ctx.createGain();
                     o.type='sine'; o.frequency.value=800; o.connect(g); g.connect(ctx.destination);
                     g.gain.setValueAtTime(0.5, ctx.currentTime); o.start(); g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+0.3); o.stop(ctx.currentTime+0.3);
-                    // PUSH NOTIFICATION IF APP INSTALLED AND USER NOT IN CHAT
                     if(Notification.permission==='granted' && document.hidden){{
                         navigator.serviceWorker.ready.then(reg=>{{
                             reg.showNotification('New message from {other}', {{body: 'You have a new message', icon:'{FAVICON_URL}', vibrate:[200,100,200]}});
@@ -874,34 +876,31 @@ def dm_page(nickname, user, other):
             }}
         }});
     }}, 3000);
-
-    let replyText = '';
     function showMenu(e, id, text){{
         e.preventDefault();
         let menu = document.getElementById('msgMenu');
         if(!menu){{
             menu = document.createElement('div');
             menu.id='msgMenu';
-            menu.style='position:fixed;background:white;border:1px solid #ccc;border-radius:8px;padding:5px;z-index:10000;box-shadow:0 4px 10px rgba(0,0,0,0.2)';
+            menu.style='position:fixed;background:white;border:1px solid #ccc;border-radius:8px;padding:8px;z-index:10000;box-shadow:0 4px 10px rgba(0,0,0,0.2)';
             document.body.appendChild(menu);
         }}
-        menu.innerHTML = `<button onclick="doReply(${{id}},'${{text}}')" class=btn blue style='padding:5px;margin:2px'>↩️ Reply</button><button onclick="doCopy('${{text}}')" class=btn gray style='padding:5px;margin:2px'>📋 Copy</button><button onclick="doDelete(${{id}})" class=btn red style='padding:5px;margin:2px'>🗑️ Delete</button><button onclick="this.parentElement.style.display='none'" class=btn gray style='padding:5px;margin:2px'>X</button>`;
+        menu.innerHTML = '<button onclick="doReply('+id+',`'+text+'`)" class=btn blue style=padding:5px;margin:2px>Reply</button><button onclick="doCopy(`'+text+'`)" class=btn gray style=padding:5px;margin:2px>Copy</button><button onclick="doDelete('+id+')" class=btn red style=padding:5px;margin:2px>Delete</button><button onclick="this.parentElement.style.display=`none`" class=btn gray style=padding:5px;margin:2px>X</button>';
         menu.style.left = e.pageX+'px'; menu.style.top = e.pageY+'px'; menu.style.display='block';
     }}
-    function doReply(id, text){{ replyText=text; document.getElementById('replyPreview').style.display='flex'; document.getElementById('replyPreviewText').innerText=text.substring(0,50); document.getElementById('replyToInput').value=text; document.getElementById('msgMenu').style.display='none'; }}
-    function doCopy(text){{ navigator.clipboard.writeText(text); document.getElementById('msgMenu').style.display='none'; alert('Copied!'); }}
-    function doDelete(id){{ if(confirm('Delete this message?')){{ window.location.href='/dm/{other}?del_msg='+id; }} }}
-    function cancelReply(){{ document.getElementById('replyPreview').style.display='none'; document.getElementById('replyToInput').value=''; replyText=''; }}
-    document.addEventListener('click', function(e){{ if(!e.target.closest('#msgMenu') &&!e.target.closest('.bubble')){{ let m=document.getElementById('msgMenu'); if(m) m.style.display='none'; }} }});
+    function doReply(id, text){{ document.getElementById('replyPreview').style.display='flex'; document.getElementById('replyPreviewText').innerText=text.substring(0,50); document.getElementById('replyToInput').value=text; document.getElementById('msgMenu').style.display='none'; }}
+    function doCopy(text){{ navigator.clipboard.writeText(text); document.getElementById('msgMenu').style.display='none'; }}
+    function doDelete(id){{ if(confirm('Delete?')) window.location.href='/dm/{other}?del_msg='+id; }}
+    function cancelReply(){{ document.getElementById('replyPreview').style.display='none'; document.getElementById('replyToInput').value=''; }}
     """)
 
     verified_badge = ""
     if other == 'motiz_support':
-        verified_badge = " <span class=badge style='background:gold;color:#0f3460'>✓ MOTIZ SUPPORT VERIFIED</span>"
+        verified_badge = " <span class=badge style='background:gold;color:#0f3460'>VERIFIED</span>"
     elif other_user.get('is_verified'):
-        verified_badge = " <span class=badge style='background:#28a745'>✓ Verified Paid</span>"
+        verified_badge = " <span class=badge style='background:#28a745'>Verified Paid</span>"
 
-    content = f"<h3>💬 {other_user['name']}{verified_badge} ({format_last_seen(other_user.get('last_seen'))})</h3><div id=chatBox>{chat_html}</div><form method=POST class=chat-input-fixed><div id=replyPreview class=reply-preview style='display:none'><span id=replyPreviewText></span><button type=button onclick='cancelReply()' style='background:red;color:white;border:none;border-radius:50%;width:20px'>X</button></div><input type=hidden name=reply_to id=replyToInput><div style='display:flex;gap:5px'><input name=text id=chatInput placeholder='Type message... (max 700)' required autocomplete=off maxlength=700 style='flex:1'><button class=send-img-btn><img src={SEND_BTN_URL}></button></div></form><button class=btn blue onclick='history.back()' style='margin-bottom:120px'>⬅️ Back</button><div id=msgMenu style='display:none'></div>"
+    content = f"<h3>{other_user['name']}{verified_badge}</h3><div id=chatBox>{chat_html}</div><form method=POST class=chat-input-fixed><div id=replyPreview class=reply-preview style='display:none'><span id=replyPreviewText></span><button type=button onclick='cancelReply()' style='background:red;color:white;border:none;border-radius:50%;width:20px'>X</button></div><input type=hidden name=reply_to id=replyToInput><div style='display:flex;gap:5px'><input name=text placeholder='Type... max 700' required maxlength=700 style='flex:1'><button class=send-img-btn><img src={SEND_BTN_URL}></button></div></form><button class=btn blue onclick='history.back()' style='margin-bottom:120px'>Back</button><div id=msgMenu style='display:none'></div>"
     return render_template_string(BASE, title=f"Chat {other}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
 
 @app.route('/check_dm/<other>')
