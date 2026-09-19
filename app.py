@@ -1065,7 +1065,7 @@ def admin(nickname, user):
                         if n.get('id')==nid:
                             n['title']=request.form["notice_title"]; n['text']=request.form["notice_text"]; n['media_link']=request.form.get("media_link","")
                     set_setting("notices", json.dumps(NOTICES)); error = "<div class=success>Notice Updated</div>"
-                                if "delete_notice" in request.form:
+                if "delete_notice" in request.form:
                     nid = int(request.form["notice_id"])
                     NOTICES = [n for n in NOTICES if n.get('id')!=nid]
                     set_setting("notices", json.dumps(NOTICES)); error = "<div class=error>Notice Deleted</div>"
