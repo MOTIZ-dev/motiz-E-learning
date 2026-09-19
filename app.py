@@ -57,6 +57,7 @@ SUBJECTS = {
     "SS3_Art": ["English Language", "Mathematics", "Civic Education", "Literature in English", "Government", "Christian Religious Studies (CRS)", "Islamic Religious Studies (IRS)", "Yoruba", "Economics", "Computer Studies / ICT", "Craft"]
 }
 SUBJECT_EMOJI = {"Mathematics":"📐","Further Mathematics":"📏","Physics":"⚛️","Chemistry":"🧑‍🔬","Biology":"🧬","English Language":"📝","Economics":"📊","Financial Accounting":"💰","Commerce":"🏪","Business Management":"📈","Literature in English":"📚","Government":"🏛️","Christian Religious Studies":"✝️","Christian Religious Studies (CRS)":"✝️","Islamic Religious Studies":"☪️","Islamic Religious Studies (IRS)":"☪️","Yoruba":"🗣️","ICT":"💻","Computer Studies / ICT":"💻","Agricultural Science":"🌾","Geography":"🌍","Basic Science":"🔬","Basic Technology":"🔧","Social Studies":"🌐","Civic Education":"⚖️","Business Studies":"💼","Physical and Health Education":"⚽","Marketing":"📢","History":"📜","Craft":"🎨"}
+
 def subj_emoji(s):
     for k,v in SUBJECT_EMOJI.items():
         if k.lower() in s.lower() or s.lower() in k.lower(): return v
@@ -64,7 +65,7 @@ def subj_emoji(s):
 
 def init_db():
     with engine.connect() as conn:
-        conn.execute(sa.text("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, nickname TEXT UNIQUE, name TEXT, password TEXT, class TEXT, dept TEXT, q_cycle TEXT DEFAULT 'free', q_used INTEGER DEFAULT 0, free_questions_used INTEGER DEFAULT 0, lesson_expiry DATE, correct INTEGER DEFAULT 0, wrong INTEGER DEFAULT 0, friends TEXT DEFAULT '[]', referred_by TEXT DEFAULT NULL, referral_count INTEGER DEFAULT 0, free_days INTEGER DEFAULT 0, is_verified BOOLEAN DEFAULT FALSE, payment_verified_date TEXT, last_seen TIMESTAMP);"))
+        conn.execute(sa.text("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, nickname TEXT UNIQUE, name TEXT, password TEXT, class TEXT, dept TEXT, q_cycle TEXT DEFAULT 'free', q_used INTEGER DEFAULT 0, free_questions_used INTEGER DEFAULT 0, lesson_expiry DATE, correct INTEGER DEFAULT 0, wrong INTEGER DEFAULT 0, friends TEXT DEFAULT '[]', referred_by TEXT DEFAULT NULL, referral_count INTEGER DEFAULT 0, free_days INTEGER DEFAULT 0, is_verified BOOLEAN DEFAULT FALSE, payment_verified_date TEXT, last_seen TIMESTAMP, push_sub TEXT DEFAULT '');"))
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS payments (id SERIAL PRIMARY KEY, nickname TEXT, name TEXT, type TEXT, status TEXT, bank_used TEXT, account_name TEXT, date_paid TEXT);"))
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS friend_requests (id SERIAL PRIMARY KEY, from_nickname TEXT, to_nickname TEXT, status TEXT DEFAULT 'Pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"))
         conn.execute(sa.text("CREATE TABLE IF NOT EXISTS posts (id SERIAL PRIMARY KEY, nickname TEXT, name TEXT, text TEXT, likes TEXT DEFAULT '[]', comments TEXT DEFAULT '[]', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, bg TEXT DEFAULT '');"))
@@ -82,7 +83,7 @@ init_db()
 
 def fix_old_users():
     with DBSession() as db:
-        cols = [("users","free_questions_used","INTEGER DEFAULT 0"),("users","q_used","INTEGER DEFAULT 0"),("users","correct","INTEGER DEFAULT 0"),("users","wrong","INTEGER DEFAULT 0"),("users","referral_count","INTEGER DEFAULT 0"),("users","free_days","INTEGER DEFAULT 0"),("users","friends","TEXT DEFAULT '[]'"),("users","referred_by","TEXT"),("users","payment_verified_date","TEXT"),("users","lesson_expiry","DATE"),("users","is_verified","BOOLEAN DEFAULT FALSE"),("users","last_seen","TIMESTAMP"),("dms","delivered_to","TEXT DEFAULT '[]'"),("lessons","media_link","TEXT DEFAULT ''"),("posts","bg","TEXT DEFAULT ''")]
+        cols = [("users","free_questions_used","INTEGER DEFAULT 0"),("users","q_used","INTEGER DEFAULT 0"),("users","correct","INTEGER DEFAULT 0"),("users","wrong","INTEGER DEFAULT 0"),("users","referral_count","INTEGER DEFAULT 0"),("users","free_days","INTEGER DEFAULT 0"),("users","friends","TEXT DEFAULT '[]'"),("users","referred_by","TEXT"),("users","payment_verified_date","TEXT"),("users","lesson_expiry","DATE"),("users","is_verified","BOOLEAN DEFAULT FALSE"),("users","last_seen","TIMESTAMP"),("users","push_sub","TEXT DEFAULT ''"),("dms","delivered_to","TEXT DEFAULT '[]'"),("lessons","media_link","TEXT DEFAULT ''"),("posts","bg","TEXT DEFAULT ''")]
         for table,col,typ in cols:
             try:
                 db.execute(sa.text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {typ}"))
@@ -173,120 +174,137 @@ def format_last_seen(dt):
     except: return "Unknown"
 
 def format_12h(time_str):
-    # FIX 1: 24hr -> 12hr AM/PM
     try:
         if not time_str: return ""
         s = str(time_str)
-        # handle ISO datetime
-        if "T" in s: s = s.replace("T"," ")
-        # try parse with timezone
-        for fmt in ["%Y-%m-%d %H:%M:%S%z", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%H:%M:%S", "%H:%M"]:
-            try:
-                dt = datetime.strptime(s[:19], fmt[:len(s[:19])]) if len(s) >= len(fmt) else None
-                # simpler: extract HH:MM
-                if ":" in s:
-                    # get HH:MM part
-                    import re
-                    m = re.search(r'(\d{1,2}):(\d{2})', s)
-                    if m:
-                        h = int(m.group(1)); mm = m.group(2)
-                        ampm = "AM" if h < 12 else "PM"
-                        h12 = h % 12
-                        if h12 == 0: h12 = 12
-                        return f"{h12}:{mm} {ampm}"
-            except: continue
-        return s
+        import re
+        m = re.search(r'(\d{1,2}):(\d{2})', s)
+        if m:
+            h = int(m.group(1)); mm = m.group(2)
+            ampm = "AM" if h < 12 else "PM"
+            h12 = h % 12
+            if h12 == 0: h12 = 12
+            return f"{h12}:{mm} {ampm}"
+        return s[:16]
     except: return str(time_str)[:16]
+
+def get_unread_count(nickname):
+    with DBSession() as db:
+        all_dms = db.execute(sa.text("SELECT read_by FROM dms WHERE to_nickname=:u"), {"u": nickname}).mappings().all()
+        count = 0
+        for m in all_dms:
+            try: rb = json.loads(m['read_by'] or '[]')
+            except: rb = []
+            if nickname not in rb: count += 1
+        return count
+
+def get_unread_per_friend(nickname, friend):
+    with DBSession() as db:
+        all_dms = db.execute(sa.text("SELECT read_by FROM dms WHERE from_nickname=:f AND to_nickname=:u"), {"f": friend, "u": nickname}).mappings().all()
+        c=0
+        for m in all_dms:
+            try: rb=json.loads(m['read_by'] or '[]')
+            except: rb=[]
+            if nickname not in rb: c+=1
+        return c
 
 BASE = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="{FAVICON_URL}">
 <link rel="manifest" href="/manifest.json">
 <title>{{{{title}}}}</title><style>
-:root{{--bg:#f0f2f5;--card:white;--text:#333;--primary:#0f3460}} body.dark{{--bg:#121212;--card:#1e1e1e;--text:#eee}}
-body{{font-family:Segoe UI;background:var(--bg);color:var(--text);margin:0;padding:0;padding-bottom:70px}}
+:root{{--bg:#f0f2f5;--card:white;--text:#333;--primary:#0f3460}} body{{font-family:Segoe UI;background:var(--bg);color:var(--text);margin:0;padding:0;padding-bottom:70px}}
+body.dark{{--bg:#121212;--card:#1e1e1e;--text:#eee}} body.light{{--bg:#f0f2f5;--card:white;--text:#333}}
 .header{{background:var(--primary);color:white;padding:6px 10px;text-align:center;position:fixed;top:0;width:100%;z-index:1000;display:flex;justify-content:space-between;align-items:center;height:50px;box-sizing:border-box}}
-.header h1{{margin:0;font-size:0.80rem;flex:1;text-align:center;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:white!important}}
-.header img.logo{{width:45px;height:45px;border-radius:50%;margin-left:5px}}
-.theme-btn{{border:none;background:transparent;color:white;font-size:1.2rem;cursor:pointer;margin-right:10px}}
-.exit-btn{{background:transparent;color:white;border:none;padding:5px 10px;text-decoration:none;font-size:1.3rem;margin-left:10px}}
-.nav{{display:flex;gap:5px;background:#16213e;padding:5px;flex-wrap:wrap;position:fixed;top:50px;width:100%;overflow-x:auto;z-index:999}}
-.nav a{{color:white;text-decoration:none;padding:5px 8px;border-radius:10px;border:1px solid #fff3;font-size:0.8rem}}
+.header h1{{margin:0;font-size:0.80rem;flex:1;text-align:center;color:white!important}}
+.header img.logo{{width:45px;height:45px;border-radius:50%}}
+.theme-btn{{border:none;background:transparent;color:white;font-size:1.2rem;cursor:pointer}}
+.exit-btn{{background:transparent;color:white;border:none;padding:5px 10px;font-size:1.3rem;cursor:pointer}}
+.nav{{display:flex;gap:5px;background:#16213e;padding:5px;flex-wrap:wrap;position:fixed;top:50px;width:100%;z-index:999}}
+.nav a{{color:white!important;text-decoration:none;padding:5px 8px;border-radius:10px;border:1px solid #fff3;font-size:0.8rem}}
+.nav a:visited{{color:white!important}}
 .container{{padding:10px;padding-top:105px;padding-bottom:30px}}
-.card{{background:var(--card);padding:12px;margin:8px 0;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,0.1);box-sizing:border-box;max-width:100%;overflow:hidden}}
+.card{{background:var(--card);padding:12px;margin:8px 0;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}}
 .card:last-child{{margin-bottom:80px!important}}
-.btn{{background:#28a745;color:white!important;padding:10px 12px;text-decoration:none;border-radius:8px;display:block;margin:8px auto;text-align:center;font-weight:bold;border:none;width:95%;max-width:350px;cursor:pointer;box-sizing:border-box;font-size:0.9rem}}
-.btn.red{{background:#e94560!important;color:white!important}}.btn.blue{{background:#0f3460!important;color:white!important;border:1px solid white}}.btn.orange{{background:#ff9800!important;color:white!important}}.btn.gray{{background:#0f3460!important;color:white!important;font-size:0.85rem;padding:9px 10px;margin:6px auto;border:1px solid #fff2;width:90%;max-width:300px}}
-input,select,textarea{{width:100%;padding:10px;margin:5px 0;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;font-size:1rem;background:var(--card);color:var(--text)}}
-.success{{color:green;background:#d4edda;padding:10px;border-radius:5px}}.error{{color:red;background:#f8d7da;padding:10px;border-radius:5px}}
+.btn{{background:#28a745;color:white!important;padding:10px;display:block;margin:8px auto;text-align:center;font-weight:bold;border:none;width:95%;max-width:350px;border-radius:8px;cursor:pointer}}
+.btn.red{{background:#e94560!important}}.btn.blue{{background:#0f3460!important;border:1px solid white}}.btn.orange{{background:#ff9800!important}}.btn.gray{{background:#0f3460!important;width:90%;max-width:300px;font-size:0.85rem}}
+input,select,textarea{{width:100%;padding:10px;margin:5px 0;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;background:var(--card);color:var(--text)}}
 .badge{{background:#1DA1F2;color:white;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:5px}}
-.badge.gold{{background:gold;color:#0f3460;border:1px solid #0f3460;font-weight:bold}}
-.badge.verified-paid{{background:#28a745;color:white}}
-.notice-title{{font-size:1.1rem;font-weight:bold;color:var(--primary);margin-bottom:5px}}
-.timer{{background:#e94560;color:white;padding:12px;text-align:center;border-radius:8px;font-weight:bold;font-size:1.1rem;margin-bottom:10px;position:sticky;top:105px;z-index:998}}
-.option{{background:#f0f2f5;padding:14px;margin:10px 0;border-radius:8px;border:1px solid #ddd;color:black;display:flex;align-items:flex-start;gap:10px}}
-.chat-msg{{display:flex;margin:8px 0;align-items:flex-end;gap:8px}}.chat-msg.me{{justify-content:flex-end}}.chat-msg.other{{justify-content:flex-start}}
-.bubble{{display:flex;flex-direction:column;padding:10px 14px;border-radius:18px;max-width:70%;box-shadow:0 1px 1px rgba(0,0,0,0.1)}}
-.me.bubble{{background:#2196f3!important;color:white!important;border-bottom-right-radius:4px}}
-.other.bubble{{background:#e0e0e0;color:#333;border-bottom-left-radius:4px}}
-.bubble-time{{font-size:11px;opacity:0.8;align-self:flex-end;margin-top:2px;display:flex;gap:6px;align-items:center}}
+.badge.gold{{background:gold;color:#0f3460;font-weight:bold}}.badge.verified-paid{{background:#28a745;color:white}}
+.timer{{background:#e94560;color:white;padding:12px;text-align:center;border-radius:8px;font-weight:bold;position:sticky;top:105px;z-index:998}}
+.option{{background:#f0f2f5;padding:14px;margin:10px 0;border-radius:8px;color:black;display:flex;gap:10px}}
+.chat-msg{{display:flex;margin:8px 0;gap:8px}}.chat-msg.me{{justify-content:flex-end}}.chat-msg.other{{justify-content:flex-start}}
+.bubble{{padding:10px 14px;border-radius:18px;max-width:70%}}.me.bubble{{background:#2196f3!important;color:white!important}}.other.bubble{{background:#e0e0e0;color:#333}}
+.bubble-time{{font-size:11px;opacity:0.8;align-self:flex-end;margin-top:2px;display:flex;gap:6px}}
 .tick-seen{{color:#4fc3f7;font-weight:bold}}.tick-delivered{{color:#e0e0e0}}.tick-sent{{color:#ccc}}
-.friend-card{{display:flex;align-items:center;gap:10px;padding:12px;background:var(--card);border-radius:10px;margin:8px 0;text-decoration:none;color:var(--text);max-width:100%;box-sizing:border-box}}
+.friend-card{{display:flex;align-items:center;gap:10px;padding:12px;background:var(--card);border-radius:10px;margin:8px 0;text-decoration:none;color:var(--text)}}
 .friend-avatar{{width:45px;height:45px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-weight:bold}}
-.readonly-box{{width:100%;padding:12px;background:#eee;border:1px dashed #999;font-size:1.1rem;font-weight:bold;text-align:center;user-select:all}}
-.chat-input-fixed{{position:fixed;bottom:65px;left:10px;right:10px;display:flex;gap:5px;background:var(--card);padding:10px;border-radius:15px;box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:999}}
-.send-img-btn{{background:transparent;border:none;padding:0;cursor:pointer}}
-.send-img-btn img{{height:40px;width:40px}}
-.lesson-media{{width:100%;border-radius:10px;margin-top:8px;max-height:350px;object-fit:contain}}
-.motiz-support{{border:3px solid gold;background:linear-gradient(135deg,#fff8e1,#ffe082)!important;font-weight:bold}}
-#fixedAdBar{{position:fixed;bottom:0;left:0;width:100%;height:60px;background:white;z-index:99999;border-top:1px solid #ddd;display:flex;align-items:center;justify-content:center;overflow:hidden}}
+.readonly-box{{width:100%;padding:12px;background:#eee;border:1px dashed #999;text-align:center}}
+.chat-input-fixed{{position:fixed;bottom:65px;left:10px;right:10px;display:flex;flex-direction:column;gap:5px;background:var(--card);padding:10px;border-radius:15px;z-index:999}}
+.reply-preview{{background:#f0f2f5;border-left:4px solid #2196f3;padding:6px 10px;border-radius:5px;display:flex;justify-content:space-between;color:#333}}
+.send-img-btn{{background:transparent;border:none}}.send-img-btn img{{height:40px;width:40px}}
+#fixedAdBar{{position:fixed;bottom:0;left:0;width:100%;height:60px;background:white;z-index:99999;border-top:1px solid #ddd;display:flex;justify-content:center;align-items:center}}
 #updateBanner{{display:none;position:fixed;top:0;left:0;width:100%;background:#ff9800;color:white;padding:10px;text-align:center;z-index:100001}}
-a{{text-decoration:none;color:var(--primary)}} a:visited{{color:var(--primary)}}
-.cbt-btn-fix{{display:block;width:95%;max-width:340px;box-sizing:border-box;white-space:normal;line-height:1.3;padding:10px 8px;font-size:0.85rem;word-break:break-word;margin:8px auto}}
-.calc-float{{position:fixed;bottom:80px;right:10px;background:#0f3460;color:white;padding:10px;border-radius:10px;z-index:9998;width:220px;display:none}}
-.bg-option{{width:40px;height:40px;border-radius:8px;display:inline-block;margin:5px;cursor:pointer;border:2px solid transparent}}
-.bg-option.selected{{border:2px solid #0f3460;transform:scale(1.1)}}
-.community-bg-post{{padding:30px 15px;text-align:center;border-radius:15px;color:white;font-size:1.4rem;font-weight:bold;min-height:120px;display:flex;align-items:center;justify-content:center;word-break:break-word}}
+.cbt-btn-fix{{display:block;width:95%;max-width:340px;white-space:normal;line-height:1.3;padding:10px;font-size:0.85rem;margin:8px auto}}
+.calc-float{{position:fixed;bottom:80px;right:10px;background:#222;color:white;padding:10px;border-radius:10px;z-index:9998;width:220px;display:none;border:2px solid #ff9800}}
+.community-bg-post{{padding:30px 15px;text-align:center;border-radius:15px;color:white;font-size:1.4rem;font-weight:bold;min-height:120px;display:flex;align-items:center;justify-content:center}}
 </style></head><body>
-<div id="updateBanner">🔄 New version available - <button onclick="location.reload(true)" style="background:white;color:#ff9800;border:none;padding:5px 10px;border-radius:5px;font-weight:bold;">Update now</button></div>
+<div id="updateBanner">🔄 New version - <button onclick="location.reload(true)" style="background:white;color:#ff9800;border:none;padding:5px 10px;border-radius:5px">Update now</button></div>
 {{{{header}}}}<div class="container">{{{{content}}}}</div>
-<div id="fixedAdBar">
-<button onclick="document.getElementById('fixedAdBar').style.display='none';document.body.style.paddingBottom='0px'" style="position:absolute;top:2px;right:5px;z-index:100000;background:#000;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;">X</button>
-<div id="adContainer" style="width:728px;max-width:100%;height:60px;display:flex;align-items:center;justify-content:center;">
-<script>atOptions = {{'key' : '{FIXED_AD_KEY}','format' : 'iframe','height' : 60,'width' : 728,'params' : {{}} }};</script>
-<script src="https://www.highrevenueformat.com/{FIXED_AD_KEY}/invoke.js"></script>
-</div>
-</div>
+<div id="fixedAdBar"><button onclick="document.getElementById('fixedAdBar').style.display='none'" style="position:absolute;top:2px;right:5px;background:#000;color:#fff;border:none;border-radius:50%;width:20px;height:20px">X</button><div id="adContainer" style="width:728px;max-width:100%;height:60px;display:flex;align-items:center;justify-content:center;"><script>atOptions = {{'key' : '{FIXED_AD_KEY}','format' : 'iframe','height' : 60,'width' : 728,'params' : {{}} }};</script><script src="https://www.highrevenueformat.com/{FIXED_AD_KEY}/invoke.js"></script></div></div>
 <script>
 {{{{timer_script}}}}
-if(window.location.pathname.startsWith('/exam') || window.location.pathname.startsWith('/cbt/')){{
-var ad=document.getElementById('fixedAdBar'); if(ad) ad.style.display='none';
-}}
+if(window.location.pathname.startsWith('/exam') || window.location.pathname.startsWith('/cbt/')){{ var ad=document.getElementById('fixedAdBar'); if(ad) ad.style.display='none'; }}
 let adRefreshInterval = {AD_REFRESH_SECONDS} * 1000;
 setInterval(function(){{
-let adBar = document.getElementById('fixedAdBar');
-if(adBar && adBar.style.display!== 'none' &&!document.hidden){{
-try{{
-let newScript = document.createElement('script');
-newScript.src = 'https://www.highrevenueformat.com/{FIXED_AD_KEY}/invoke.js';
-document.getElementById('adContainer').appendChild(newScript);
-}}catch(e){{}}
-}}
+ let adBar=document.getElementById('fixedAdBar');
+ if(adBar && adBar.style.display!=='none' &&!document.hidden){{
+  try{{ let ns=document.createElement('script'); ns.src='https://www.highrevenueformat.com/{FIXED_AD_KEY}/invoke.js'; document.getElementById('adContainer').appendChild(ns); }}catch(e){{}}
+ }}
 }}, adRefreshInterval);
-if('serviceWorker' in navigator){{ navigator.serviceWorker.register('/sw.js').then(reg=>{{ reg.onupdatefound=()=>{{ document.getElementById('updateBanner').style.display='block'; }} }}); }}
+(function(){{
+ let saved = localStorage.getItem('motiz_theme') || 'dark';
+ document.body.classList.remove('light','dark');
+ document.body.classList.add(saved);
+ let btn=document.getElementById('themeToggle');
+ if(btn) btn.innerText = saved==='light'? '☀️ Light' : '🌙 Dark';
+}})();
+function toggleTheme(){{
+ let isLight = document.body.classList.contains('light');
+ document.body.classList.remove('light','dark');
+ if(isLight){{ document.body.classList.add('dark'); localStorage.setItem('motiz_theme','dark'); document.getElementById('themeToggle').innerText='🌙 Dark'; }}
+ else {{ document.body.classList.add('light'); localStorage.setItem('motiz_theme','light'); document.getElementById('themeToggle').innerText='☀️ Light'; }}
+}}
+function playClickSound(){{ try{{ let ctx=new (window.AudioContext||window.webkitAudioContext)(); let o=ctx.createOscillator(); o.frequency.value=600; o.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.08); }}catch(e){{}} }}
+document.addEventListener('click', function(e){{ if(e.target.closest('.btn')) playClickSound(); }});
+let lastGlobalUnread = 0;
+setInterval(()=>{{
+ if(window.location.pathname.startsWith('/dm/') || window.location.pathname.startsWith('/group/')) return;
+ fetch('/check_unread').then(r=>r.json()).then(data=>{{
+  if(data.count > lastGlobalUnread && lastGlobalUnread!==0){{
+   try{{ let ctx=new (window.AudioContext||window.webkitAudioContext)(); let o=ctx.createOscillator(); let g=ctx.createGain(); o.type='sine'; o.frequency.value=800; o.connect(g); g.connect(ctx.destination); g.gain.setValueAtTime(0.5, ctx.currentTime); o.start(); g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+0.3); o.stop(ctx.currentTime+0.3); }}catch(e){{}}
+  }}
+  lastGlobalUnread = data.count;
+ }});
+}}, 10000);
+if('serviceWorker' in navigator){{
+ navigator.serviceWorker.register('/sw.js').then(reg=>{{
+  reg.onupdatefound=()=>{{ document.getElementById('updateBanner').style.display='block'; }};
+  if(Notification.permission!=='granted'){{ Notification.requestPermission(); }}
+ }});
+}}
 </script>
 </body></html>"""
 
 def get_header(nickname,user, show_nav=True, show_favicon=False):
     if not user: return ""
-    exit_html = '<a href="/main" class="exit-btn">🔙</a>' if not show_favicon else ""
+    exit_html = f'<button onclick="history.back()" class="exit-btn">⬅️</button>' if not show_favicon else ""
     favicon_html = f'<img src="{FAVICON_URL}" class="logo">' if show_favicon else ""
-    theme_html = '<button class="theme-btn" onclick="document.body.classList.toggle(\'dark\')">🌙</button>'
+    theme_html = f'<button class="theme-btn" id="themeToggle" onclick="toggleTheme()">🌙</button>'
+    unread = get_unread_count(nickname) if nickname!='motiz_support' else 0
+    bell = f" 🔔({unread})" if unread>0 else ""
     is_support = nickname=='motiz_support'
-    if is_support:
-        verified = '<span class=badge gold>✓ MOTIZ SUPPORT VERIFIED</span>'
-    else:
-        verified = '<span class=badge verified-paid>✓ Verified Paid</span>' if user.get('is_verified') else ""
-    nav_html = """<div class="nav"><a href="/main">🏠 Home</a><a href="/exam">✍️ CBT</a><a href="/lessons">🎓 Lessons</a><a href="/community">🌍 Community</a><a href="/chat">💬 Chat</a><a href="/me">👤 Me</a><a href="/complain">📩 Complain</a></div>""" if show_nav else ""
+    verified = '<span class=badge gold>✓ MOTIZ SUPPORT VERIFIED</span>' if is_support else ('<span class=badge verified-paid>✓ Verified Paid</span>' if user.get('is_verified') else "")
+    nav_html = f"""<div class="nav"><a href="/main">🏠 Home</a><a href="/exam">✍️ CBT</a><a href="/lessons">🎓 Lessons</a><a href="/community">🌍 Community</a><a href="/chat">💬 Chat{bell}</a><a href="/me">👤 Me</a><a href="/complain">📩 Complain</a></div>""" if show_nav else ""
     return f"""<div class="header">{favicon_html}{exit_html}<h1 style="color:white!important">MOTIZ E-LEARNING {verified}</h1>{theme_html}</div>{nav_html}"""
 
 @app.route('/manifest.json')
@@ -295,7 +313,21 @@ def manifest():
 
 @app.route('/sw.js')
 def sw():
-    return Response("self.addEventListener('install', e=>self.skipWaiting()); self.addEventListener('activate', e=>self.clients.claim()); self.addEventListener('fetch', e=>{e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)))});", mimetype='application/javascript')
+    return Response("""
+self.addEventListener('install', e=>self.skipWaiting());
+self.addEventListener('activate', e=>self.clients.claim());
+self.addEventListener('fetch', e=>{ e.respondWith(fetch(e.request).catch(()=>caches.match(e.request))) });
+self.addEventListener('push', function(event){
+  const data = event.data? event.data.json() : {title:'MOTIZ', body:'New message from friend'};
+  event.waitUntil(self.registration.showNotification(data.title, {body:data.body, icon:'https://i.imgur.com/5TCBgkN.png', badge:'https://i.imgur.com/5TCBgkN.png', vibrate:[200,100,200]}));
+});
+self.addEventListener('notificationclick', function(event){ event.notification.close(); event.waitUntil(clients.openWindow('/chat')); });
+""", mimetype='application/javascript')
+
+@app.route('/check_unread')
+@login_required
+def check_unread(nickname, user):
+    return Response(json.dumps({"count": get_unread_count(nickname)}), mimetype="application/json")
 
 @app.route('/')
 def splash():
@@ -336,7 +368,7 @@ def login():
             u = db.execute(sa.text("SELECT * FROM users WHERE nickname=:u"), {"u": nickname}).mappings().first()
             if u and u["password"] == pwd: session["nickname"] = nickname; return redirect("/main")
             else: error = "<div class=error>Invalid Nickname or Password</div>"
-    return render_template_string(BASE, title="Login", header="", content=Markup(f"<div class='card'><h2>Login</h2>{error}<form method=POST><input name=nickname placeholder='Nickname' required><input type=password name=password placeholder=Password required><button class=btn>Login</button><a class=btn blue href=/register>Register</a></form></div>"), timer_script="")
+    return render_template_string(BASE, title="Login", header="", content=Markup(f"<div class='card'><h2>Login</h2>{error}<form method=POST><input name=nickname placeholder='Nickname' required><input type=password name=password placeholder=Password required><button class=btn>Login</button><p style='text-align:center;margin-top:15px;font-size:0.9rem'>Don't have an account? <a href=/register style='color:#0f3460;font-weight:bold;text-decoration:underline'>Click to Register</a></p></form></div>"), timer_script="")
 
 @app.route('/main')
 @login_required
@@ -357,7 +389,6 @@ def main(nickname, user):
                 media = f"<video src='{link}' controls class='lesson-media'></video>"
             else:
                 media = f"<img src='{link}' class='lesson-media'>"
-        # FIX 1: Use 12hr format for notice time
         time_12 = format_12h(n.get('created_at',''))
         notices_html += f"<div class='card'><div class=notice-title>📢 {n['title']}</div>{n['text']}{media}<small style='float:right'>{time_12}</small></div>"
     return render_template_string(BASE, title="Home", header=Markup(get_header(nickname,user, show_nav=True, show_favicon=True)), content=Markup(f"<div class='card'><h2>Welcome {user['name']}</h2><p><b>Class:</b> {user['class']} {user.get('dept','')}</p></div>{pinned_html}<h3>General Notice</h3>{notices_html}<a class=btn href=/exam>Start CBT Exam</a>"), timer_script="")
@@ -371,7 +402,8 @@ def logout():
 def exam(nickname, user):
     key = f"{user['class']}_{user['dept']}" if user['dept'] else user['class']
     subs = SUBJECTS.get(key, [])
-    if not subs: return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=error>No subjects for your class yet</div>"), timer_script="")
+    if not subs:
+        return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=error>No subjects for your class yet</div><button class=btn blue onclick='history.back()'>⬅️ Back</button>"), timer_script="")
     if user.get('payment_verified_date'):
         try:
             verified_date = datetime.strptime(user['payment_verified_date'], "%Y-%m-%d").date()
@@ -394,18 +426,13 @@ def exam(nickname, user):
             if done >= limit or (total_q>0 and done >= total_q):
                 btn = f"<div class='card' style='border:2px solid #28a745'><b>{emoji} {s}</b><br><small>✅ Completed {done}/{min(limit,total_q)}</small><br><a class='btn blue cbt-btn-fix' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}?redo=1'>🔄 Redo / Reset</a></div>"
             else:
-                remain_free = max(0, FREE_Q - prog) if not user.get('is_verified') else 0
                 if not user.get('is_verified') and prog >= FREE_Q:
                     btn = f"<div class='card cbt-btn-fix' style='border:2px solid #e94560'><b>{emoji} {s}</b><br><small>🔒 Pay to continue (10/{FREE_Q} free done)</small><br><a class='btn red cbt-btn-fix' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}'>Unlock - Pay ₦{QUESTION_PRICE}</a></div>"
                 else:
-                    btn = f"<a class='btn blue cbt-btn-fix' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}'><span>{emoji} {s}</span><small>{done}/{min(limit,total_q)} done | Free left: {remain_free}</small></a>"
+                    btn = f"<a class='btn blue cbt-btn-fix' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}'><span>{emoji} {s}</span><br><small>{done}/{min(limit,total_q)} done</small></a>"
             sub_btns += btn
-    if not user.get('is_verified'):
-        with DBSession() as db:
-            pending = db.execute(sa.text("SELECT * FROM payments WHERE nickname=:u AND type='questions' AND status='Pending'"), {"u": nickname}).scalar()
-        if pending:
-            sub_btns = "<div class='card'><h2>⏳ Payment Under Review</h2><p>Admin verifying - you will get 70 more per subject once approved.</p></div>" + sub_btns
-    return render_template_string(BASE, title="CBT", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class='card'><h2>Subjects for {user['class']} {user.get('dept','')}</h2><p>10 FREE per subject. Shuffle + Smart timer.</p>{sub_btns}</div>"), timer_script="")
+    content = f"<div class='card'><h2>Subjects for {user['class']} {user.get('dept','')}</h2>{sub_btns}</div><button class=btn blue onclick='history.back()' style='margin-top:20px'>⬅️ Back</button>"
+    return render_template_string(BASE, title="CBT", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
 @app.route('/cbt/<path:key>/<path:sub>', methods=["GET","POST"])
 @login_required
@@ -420,7 +447,7 @@ def cbt_exam(nickname, user, key, sub):
             return redirect(f"/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}")
         all_count = db.execute(sa.text("SELECT COUNT(*) FROM questions WHERE key=:k"), {"k": full_key}).scalar() or 0
         if all_count == 0:
-            return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>😕 No Questions Yet for {subj_emoji(sub)} {sub}</h2><a class=btn blue href=/exam>Back</a></div>"), timer_script="")
+            return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>😕 No Questions Yet for {subj_emoji(sub)} {sub}</h2><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"), timer_script="")
         prog = db.execute(sa.text("SELECT used FROM cbt_progress WHERE nickname=:u AND subject_key=:k"), {"u": nickname, "k": full_key}).scalar()
         if prog is None:
             db.execute(sa.text("INSERT INTO cbt_progress (nickname, subject_key, used) VALUES (:u, :k, 0) ON CONFLICT (nickname, subject_key) DO NOTHING"), {"u": nickname, "k": full_key})
@@ -431,9 +458,9 @@ def cbt_exam(nickname, user, key, sub):
         if not user.get('is_verified') and prog >= FREE_Q:
             with DBSession() as db: pending = db.execute(sa.text("SELECT * FROM payments WHERE nickname=:u AND type='questions' AND status='Pending'"), {"u": nickname}).scalar()
             if pending:
-                content = "<div class=card><h2>⏳ Payment Under Review</h2><p>Admin verifying.</p></div>"
+                content = "<div class=card><h2>⏳ Payment Under Review</h2><p>Admin verifying.</p></div><button class=btn blue onclick='history.back()'>⬅️ Back</button>"
             else:
-                content = f'<div class=card><h2>🔒 Unlock 70 More Questions for {subj_emoji(sub)} {sub}</h2><p><b>Pay &#8358;{QUESTION_PRICE} for 30 days</b></p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account:</b><input class=readonly-box readonly value="{PALMPAY_ACCOUNT}"><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/questions><input name=bank_used placeholder="Bank you used" required><input name=account_name placeholder="Account Name" required><button class="send-img-btn"><img src="{SEND_BTN_URL}"></button></form><a class=btn blue href="/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1">🔄 Redo Free 10</a></div>'
+                content = f'<div class=card><h2>🔒 Unlock 70 More for {subj_emoji(sub)} {sub}</h2><p><b>Pay &#8358;{QUESTION_PRICE} for 30 days</b></p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account:</b><input class=readonly-box readonly value="{PALMPAY_ACCOUNT}"><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/questions><input name=bank_used placeholder="Bank you used" required><input name=account_name placeholder="Account Name" required><button class=btn>Submit</button></form><a class=btn blue href="/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1">🔄 Redo Free 10</a></div>'
             return render_template_string(BASE, title="Paywall", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
     start_index = prog
     end_index = min(start_index + BATCH_SIZE, total_limit, all_count)
@@ -443,11 +470,10 @@ def cbt_exam(nickname, user, key, sub):
     for q in questions: q['options'] = json.loads(q['options'])
     if not questions:
         return render_template_string(BASE, title="Done", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>✅ Completed {sub}</h2><a class=btn href=/exam>Back</a><a class=btn blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo</a></div>"), timer_script="")
-    # FIX 4: 30 SECS COUNTDOWN - EXACT 30 per Q, 60 for calc
     time_per_q = 60 if sub in CALC_SUBJECTS else 30
     batch_time = len(questions) * time_per_q
     if request.method == "POST":
-        score = 0; result_html = "";
+        score = 0; result_html = ""
         for i,q in enumerate(questions):
             user_ans = request.form.get(f"q{i}")
             if user_ans == q["ans"]: score += 1
@@ -460,7 +486,11 @@ def cbt_exam(nickname, user, key, sub):
             db.commit()
         remaining = min(total_limit, all_count) - new_done
         next_btn = f"<a class=btn href=/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}>Next 10 - {remaining} left</a>" if remaining>0 else f"<a class=btn blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo {sub}</a>"
-        content = f"<div class='card'><h2>🎉 RESULT {subj_emoji(sub)} {sub}</h2><p><b>Score: {score}/{total}</b></p><p>Completed: {new_done}/{min(total_limit,all_count)}</p></div>{result_html}{next_btn}<a class=btn blue href=/exam>Back</a>"
+        if score/total >= 0.5:
+            sound_js = "let ctx=new (window.AudioContext||window.webkitAudioContext)(); let notes=[523,659,784,1046]; notes.forEach((f,i)=>{let o=ctx.createOscillator(); o.frequency.value=f; o.connect(ctx.destination); o.start(ctx.currentTime+i*0.15); o.stop(ctx.currentTime+i*0.15+0.3);});"
+        else:
+            sound_js = "let ctx=new (window.AudioContext||window.webkitAudioContext)(); let o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=150; o.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.6);"
+        content = f"<div class='card'><h2>🎉 RESULT {subj_emoji(sub)} {sub}</h2><p><b>Score: {score}/{total}</b></p><p>Completed: {new_done}/{min(total_limit,all_count)}</p></div>{result_html}{next_btn}<a class=btn blue href=/exam>Back</a><script>setTimeout(()=>{{try{{{sound_js}}}catch(e){{}}}},500)</script>"
         return render_template_string(BASE, title="Result", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
     q_html = ""
     for i,q in enumerate(questions):
@@ -478,10 +508,24 @@ def cbt_exam(nickname, user, key, sub):
         timeLeft--;
     }}
     updateTimer(); setInterval(updateTimer, 1000);
-    let calcHtml = `<div id=calcBox class=calc-float><div style='display:flex;justify-content:space-between'><b>🧮 Calculator</b><button onclick="document.getElementById('calcBox').style.display='none'" style='background:red;color:white;border:none;border-radius:50%;width:20px'>X</button></div><input id=calcDisplay style='width:100%;margin:5px 0'><div style='display:grid;grid-template-columns:repeat(4,1fr);gap:3px'><button onclick="calcIn('7')" class=btn gray>7</button><button onclick="calcIn('8')" class=btn gray>8</button><button onclick="calcIn('9')" class=btn gray>9</button><button onclick="calcIn('/')" class=btn orange>/</button><button onclick="calcIn('4')" class=btn gray>4</button><button onclick="calcIn('5')" class=btn gray>5</button><button onclick="calcIn('6')" class=btn gray>6</button><button onclick="calcIn('*')" class=btn orange>*</button><button onclick="calcIn('1')" class=btn gray>1</button><button onclick="calcIn('2')" class=btn gray>2</button><button onclick="calcIn('3')" class=btn gray>3</button><button onclick="calcIn('-')" class=btn orange>-</button><button onclick="calcIn('0')" class=btn gray>0</button><button onclick="calcIn('.')" class=btn gray>.</button><button onclick="calcEval()" class=btn>=</button><button onclick="calcIn('+')" class=btn orange>+</button><button onclick="calcIn('Math.sqrt(')" class=btn blue>√</button><button onclick="calcIn('Math.sin(')" class=btn blue>sin</button><button onclick="calcIn('Math.cos(')" class=btn blue>cos</button><button onclick="document.getElementById('calcDisplay').value=''" class=btn red>C</button></div></div><button onclick="document.getElementById('calcBox').style.display='block'" style='position:fixed;bottom:80px;right:10px;z-index:9997;background:#ff9800;color:white;border:none;border-radius:50%;width:50px;height:50px;font-size:20px'>🧮</button>`;
+    let calcHtml = `<div id=calcBox class=calc-float>
+    <div style='display:flex;justify-content:space-between'><b>🧮 Calculator</b><button onclick="document.getElementById('calcBox').style.display='none'" style='background:red;color:white;border:none;border-radius:50%;width:22px'>X</button></div>
+    <input id=calcDisplay readonly style='width:100%;margin:8px 0;padding:8px;font-size:1.1rem;text-align:right;background:#000;color:#0f0;border:none;border-radius:5px'>
+    <div style='display:grid;grid-template-columns:repeat(4,1fr);gap:5px'>
+    <button onclick="calcIn('7')" class=btn gray>7</button><button onclick="calcIn('8')" class=btn gray>8</button><button onclick="calcIn('9')" class=btn gray>9</button><button onclick="calcIn('/')" class=btn orange>/</button>
+    <button onclick="calcIn('4')" class=btn gray>4</button><button onclick="calcIn('5')" class=btn gray>5</button><button onclick="calcIn('6')" class=btn gray>6</button><button onclick="calcIn('*')" class=btn orange>*</button>
+    <button onclick="calcIn('1')" class=btn gray>1</button><button onclick="calcIn('2')" class=btn gray>2</button><button onclick="calcIn('3')" class=btn gray>3</button><button onclick="calcIn('-')" class=btn orange>-</button>
+    <button onclick="calcIn('0')" class=btn gray>0</button><button onclick="calcIn('.')" class=btn gray>.</button><button onclick="calcIn('(')" class=btn gray>(</button><button onclick="calcIn(')')" class=btn gray>)</button>
+    <button onclick="calcClear()" class=btn red>C</button><button onclick="calcSqrt()" class=btn blue>√</button><button onclick="calcPow()" class=btn blue>x²</button><button onclick="calcEval()" class=btn orange style='background:green'>=</button>
+    <button onclick="calcIn('+')" class=btn orange style='grid-column:span 4'>+</button>
+    </div></div>
+    <button onclick="document.getElementById('calcBox').style.display='block'" style='position:fixed;bottom:80px;right:10px;z-index:9997;background:#ff9800;color:white;border:none;border-radius:50%;width:50px;height:50px;font-size:20px'>🧮</button>`;
     document.body.insertAdjacentHTML('beforeend', calcHtml);
     function calcIn(v){{ document.getElementById('calcDisplay').value+=v; }}
-    function calcEval(){{ try{{ let r=eval(document.getElementById('calcDisplay').value); document.getElementById('calcDisplay').value=r; }}catch(e){{ document.getElementById('calcDisplay').value='Error'; }} }}
+    function calcClear(){{ document.getElementById('calcDisplay').value=''; }}
+    function calcSqrt(){{ let d=document.getElementById('calcDisplay'); try{{ d.value=Math.sqrt(eval(d.value)); }}catch(e){{ d.value='Error'; }} }}
+    function calcPow(){{ let d=document.getElementById('calcDisplay'); try{{ d.value=Math.pow(eval(d.value),2); }}catch(e){{ d.value='Error'; }} }}
+    function calcEval(){{ let d=document.getElementById('calcDisplay'); try{{ d.value=eval(d.value); }}catch(e){{ d.value='Error'; }} }}
     """)
     content = f"<form method=POST id=cbt_form><h2 style='background:#0f3460;color:white;text-align:center;padding:10px;border-radius:8px'>{subj_emoji(sub)} {sub} - Batch {math.floor(prog/BATCH_SIZE)+1}</h2><p style='text-align:center'>{time_per_q}s per question (Total {batch_time//60}:{batch_time%60:02d})</p>{q_html}<button class='btn orange'>Submit</button></form>"
     return render_template_string(BASE, title=f"{sub}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
@@ -493,7 +537,7 @@ def confirm(nickname, user, t):
         db.execute(sa.text("INSERT INTO payments (nickname, name, type, status, bank_used, account_name, date_paid) VALUES (:u, :n, :t, 'Pending', :b, :a, :d)"),
         {"u": nickname, "n": user["name"], "t": t, "b": request.form["bank_used"], "a": request.form["account_name"], "d": str(date.today())});
         db.commit()
-    return render_template_string(BASE, title="Sent", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class='card'><h2>✅ Request Sent</h2><p>Admin will verify within 24hrs</p><a class=btn href=/exam>Back</a></div>"), timer_script="")
+    return render_template_string(BASE, title="Sent", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class='card'><h2>✅ Request Sent</h2><p>Admin will verify within 24hrs</p><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"), timer_script="")
 
 @app.route('/lessons')
 @login_required
@@ -510,7 +554,7 @@ def lessons(nickname, user):
         if user.get('lesson_expiry'):
             all_lessons = db.execute(sa.text("SELECT * FROM lessons WHERE class=:c AND (dept=:d OR dept='' OR dept IS NULL) ORDER BY date DESC"), {"c": user['class'], "d": user.get('dept','')}).mappings().all()
             if not all_lessons:
-                return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🎓 No lessons yet for {user['class']} {user.get('dept','')}</h2><a class=btn blue href=/main>Back</a></div>"), timer_script="")
+                return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🎓 No lessons yet for {user['class']} {user.get('dept','')}</h2><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"), timer_script="")
             html = ""
             for l in all_lessons:
                 media = ""
@@ -520,14 +564,33 @@ def lessons(nickname, user):
                         media = f"<video src='{link}' controls class='lesson-media'></video>"
                     else:
                         media = f"<img src='{link}' class='lesson-media'>"
-                # FIX 1: 12hr format
                 d12 = format_12h(l['date'])
                 html += f"<div class=card><h3>{subj_emoji(l['subject'])} {l['title']} - {l['subject']}</h3><p>{l['notes']}</p>{media}<small>{d12}</small></div>"
-            return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html + "<a class=btn blue href=/main>Back</a>"), timer_script="")
+            return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html + "<button class=btn blue onclick='history.back()'>⬅️ Back</button>"), timer_script="")
         pending = db.execute(sa.text("SELECT * FROM payments WHERE nickname=:u AND type='lessons' AND status='Pending'"), {"u": nickname}).scalar()
         if pending:
-            return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>⏳ Payment Under Review</h2><p>Admin will verify your lesson payment.</p><a class=btn blue href=/main>Back</a></div>"), timer_script="")
-    return render_template_string(BASE, title="Pay Lesson", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🔒 Unlock Lessons - ₦{LESSON_PRICE}/30days</h2><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Acct:</b><input class=readonly-box readonly value={PALMPAY_ACCOUNT}><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/lessons><input name=bank_used placeholder='Bank you used' required><input name=account_name placeholder='Account Name' required><button class=send-img-btn><img src={SEND_BTN_URL}></button></form></div>"), timer_script="")
+            return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>⏳ Payment Under Review</h2><p>Admin will verify your lesson payment.</p><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"), timer_script="")
+    return render_template_string(BASE, title="Pay Lesson", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🔒 Unlock Lessons - ₦{LESSON_PRICE}/30days</h2><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Acct:</b><input class=readonly-box readonly value={PALMPAY_ACCOUNT}><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/lessons><input name=bank_used placeholder='Bank you used' required><input name=account_name placeholder='Account Name' required><button class=btn>Submit</button></form></div>"), timer_script="")
+
+@app.route('/complain', methods=["GET","POST"])
+@login_required
+def complain_page(nickname, user):
+    with DBSession() as db:
+        db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname}); db.commit()
+        if request.method=="POST" and request.form.get("text"):
+            cnt = db.execute(sa.text("SELECT COUNT(*) FROM complaints WHERE nickname=:u AND created_at > NOW() - INTERVAL '7 days'"), {"u": nickname}).scalar() or 0
+            if cnt >= 3:
+                return render_template_string(BASE, title="Complain Limit", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><div class=error>❌ You don reach limit - 3 complains per week only.</div><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"), timer_script="")
+            db.execute(sa.text("INSERT INTO complaints (nickname, name, text) VALUES (:u,:n,:t)"), {"u": nickname, "n": user["name"], "t": request.form["text"][:700]})
+            db.commit()
+            return redirect("/complain")
+        my = db.execute(sa.text("SELECT * FROM complaints WHERE nickname=:u ORDER BY id DESC LIMIT 20"), {"u": nickname}).mappings().all()
+    html = "<div class=card><h2>📩 Complain to Admin (3 per week)</h2><form method=POST><textarea name=text placeholder='Write your complaint...' required maxlength=700></textarea><button class=btn>Send Complaint</button></form></div><h3>My Complaints</h3>"
+    for c in my:
+        ct12 = format_12h(str(c['created_at']))
+        reply = f"<div style='background:#d4edda;padding:8px;margin-top:5px;border-radius:5px'><b>Admin Reply:</b> {c['reply']}</div>" if c['reply'] else "<small>⏳ Pending...</small>"
+        html+=f"<div class=card><b>📝 {c['text']}</b><br><small>{ct12} - {c['status']}</small>{reply}</div>"
+    return render_template_string(BASE, title="Complain", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
 @app.route('/community', methods=["GET","POST"])
 @login_required
 def community(nickname, user):
@@ -540,8 +603,8 @@ def community(nickname, user):
                 db.execute(sa.text("DELETE FROM posts WHERE id=:i"), {"i": int(del_id)}); db.commit()
             return redirect("/community")
         if request.method=="POST" and request.form.get("text"):
-            txt = request.form["text"][:1000]
-            bg = request.form.get("bg","").strip()[:100]  # FIX 7: Facebook background
+            txt = request.form["text"][:700]
+            bg = request.form.get("bg","").strip()[:100]
             if nickname!= 'motiz_support' and ('http://' in txt.lower() or 'https://' in txt.lower() or 'www.' in txt.lower()):
                 txt = txt.replace('http://','').replace('https://','').replace('www.','')
             db.execute(sa.text("INSERT INTO posts (nickname, name, text, bg) VALUES (:u,:n,:t,:bg)"), {"u": nickname, "n": user["name"], "t": txt, "bg": bg})
@@ -549,54 +612,24 @@ def community(nickname, user):
         posts = db.execute(sa.text("SELECT * FROM posts ORDER BY created_at DESC LIMIT 50")).mappings().all()
         verified_users = db.execute(sa.text("SELECT nickname FROM users WHERE is_verified=TRUE")).scalars().all()
         verified_set = set(verified_users)
-    # FIX 6: Placeholder exactly "What is on your mind........"
-    # FIX 7: Facebook background chooser
-    bg_options = [
-        "",  # default white
-        "linear-gradient(135deg,#ff9a9e,#fecfef)",
-        "linear-gradient(135deg,#a18cd1,#fbc2eb)",
-        "linear-gradient(135deg,#ff6a00,#ee0979)",
-        "linear-gradient(135deg,#667eea,#764ba2)",
-        "linear-gradient(135deg,#f7971e,#ffd200)",
-        "linear-gradient(135deg,#000000,#434343)",
-        "linear-gradient(135deg,#11998e,#38ef7d)",
-        "linear-gradient(135deg,#fc5c7d,#6a82fb)",
-        "linear-gradient(135deg,#0f3460,#e94560)",
-    ]
+    bg_options = ["", "linear-gradient(135deg,#ff9a9e,#fecfef)", "linear-gradient(135deg,#a18cd1,#fbc2eb)", "linear-gradient(135deg,#ff6a00,#ee0979)", "linear-gradient(135deg,#667eea,#764ba2)", "linear-gradient(135deg,#f7971e,#ffd200)", "linear-gradient(135deg,#000000,#434343)", "linear-gradient(135deg,#11998e,#38ef7d)", "linear-gradient(135deg,#fc5c7d,#6a82fb)", "linear-gradient(135deg,#0f3460,#e94560)"]
     bg_html = ""
     for b in bg_options:
         if b == "":
             bg_html += f"<div class='bg-option' data-bg='' style='background:white;border:1px solid #ccc' onclick=\"selectBg(this,'')\"></div>"
         else:
             bg_html += f"<div class='bg-option' data-bg=\"{b}\" style='background:{b}' onclick=\"selectBg(this,'{b}')\"></div>"
-
     html = f"""<div class=card>
     <form method=POST id=communityForm>
-    <textarea name=text id=communityText placeholder='What is on your mind........' required maxlength=1000 oninput="previewBg()"></textarea>
+    <textarea name=text id=communityText placeholder='What is on your mind........' required maxlength=700 oninput="previewBg()"></textarea>
     <input type=hidden name=bg id=selectedBg value=''>
     <div style='margin:8px 0'><small>🎨 Choose background:</small><br>{bg_html}</div>
     <div id=bgPreview style='display:none;margin:8px 0;border-radius:12px;padding:20px;text-align:center;color:white;font-weight:bold;min-height:60px;align-items:center;justify-content:center'></div>
     <button class=btn>Post</button>
     </form>
     <script>
-    function selectBg(el, bg){{
-        document.querySelectorAll('.bg-option').forEach(x=>x.classList.remove('selected'));
-        el.classList.add('selected');
-        document.getElementById('selectedBg').value = bg;
-        previewBg();
-    }}
-    function previewBg(){{
-        let txt = document.getElementById('communityText').value;
-        let bg = document.getElementById('selectedBg').value;
-        let prev = document.getElementById('bgPreview');
-        if(bg && txt){{
-            prev.style.display='flex';
-            prev.style.background = bg;
-            prev.innerText = txt;
-        }} else {{
-            prev.style.display='none';
-        }}
-    }}
+    function selectBg(el, bg){{ document.querySelectorAll('.bg-option').forEach(x=>x.classList.remove('selected')); el.classList.add('selected'); document.getElementById('selectedBg').value = bg; previewBg(); }}
+    function previewBg(){{ let txt=document.getElementById('communityText').value; let bg=document.getElementById('selectedBg').value; let prev=document.getElementById('bgPreview'); if(bg && txt){{ prev.style.display='flex'; prev.style.background=bg; prev.innerText=txt; }} else {{ prev.style.display='none'; }} }}
     </script>
     </div>"""
     for p in posts:
@@ -608,21 +641,11 @@ def community(nickname, user):
         is_author = p['nickname']==nickname
         is_paid = p['nickname'] in verified_set
         style = "style='border:3px solid gold;background:linear-gradient(135deg,#fff8e1,#ffe082)'" if is_motiz else "style='border:2px solid #28a745'" if is_paid else ""
-        # Override style if post has bg
         bg_val = p.get('bg','') if isinstance(p, dict) else (p['bg'] if 'bg' in p else '')
-        # FIX 1: 12hr time
         t12 = format_12h(str(p['created_at']))
-        badge_html = ""
-        if is_motiz:
-            badge_html = " <span class=badge gold>✓ MOTIZ SUPPORT VERIFIED</span> <span style=background:gold;padding:2px 5px;border-radius:5px;font-size:0.6rem;color:#0f3460;font-weight:bold>ADMIN</span>"
-        elif is_paid:
-            badge_html = " <span class=badge verified-paid>✓ Verified Paid</span>"
+        badge_html = " <span class=badge gold>✓ MOTIZ SUPPORT VERIFIED</span> <span style=background:gold;padding:2px 5px;border-radius:5px;font-size:0.6rem;color:#0f3460;font-weight:bold>ADMIN</span>" if is_motiz else (" <span class=badge verified-paid>✓ Verified Paid</span>" if is_paid else "")
         del_btn = f"<a class=btn red href='/community?del_post={p['id']}' onclick=\"return confirm('Delete this post?')\" style='padding:8px;font-size:0.8rem;margin:5px 0;width:90%;max-width:280px'>🗑️ Delete</a>" if (is_author or nickname=='motiz_support') else ""
-        if bg_val:
-            # Facebook style background post
-            text_html = f"<div class='community-bg-post' style='background:{bg_val}'>{p['text']}</div>"
-        else:
-            text_html = f"<p>{p['text']}</p>"
+        text_html = f"<div class='community-bg-post' style='background:{bg_val}'>{p['text']}</div>" if bg_val else f"<p>{p['text']}</p>"
         html+=f"<div class=card {style}><b>{p['name']}</b>{badge_html}<br><small>{t12}</small>{text_html}{del_btn}<div style='display:flex;gap:5px;flex-wrap:wrap;justify-content:center'><a class=btn gray href='/like/{p['id']}' style='width:44%;max-width:140px'>👍 Like ({len(likes)})</a><a class=btn gray href='/post/{p['id']}' style='width:44%;max-width:140px'>💬 Comment ({len(comments)})</a></div></div>"
     return render_template_string(BASE, title="Community", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
 
@@ -655,60 +678,34 @@ def post_detail(nickname, user, pid):
         except: comments=[]
         bg_val = p.get('bg','') if isinstance(p, dict) else ''
         t12 = format_12h(str(p['created_at']))
-        if bg_val:
-            post_display = f"<div class='community-bg-post' style='background:{bg_val}'>{p['text']}</div>"
-        else:
-            post_display = f"<p>{p['text']}</p>"
+        post_display = f"<div class='community-bg-post' style='background:{bg_val}'>{p['text']}</div>" if bg_val else f"<p>{p['text']}</p>"
         html = f"<div class=card><b>{p['name']}</b><br><small>{t12}</small>{post_display}</div><h3>Comments ({len(comments)})</h3>"
         for c in comments:
             ct12 = format_12h(c.get('time',''))
             html+=f"<div class=card><b>{c['name']}</b><p>{c['text']}</p><small>{ct12}</small></div>"
-        html+=f"<div class=card><form method=POST><textarea name=comment placeholder='Add comment' required></textarea><button class=btn>Comment</button></form></div><a class=btn blue href=/community>Back</a>"
+        html+=f"<div class=card><form method=POST><textarea name=comment placeholder='Add comment' required></textarea><button class=btn>Comment</button></form></div><button class=btn blue onclick='history.back()'>⬅️ Back</button>"
     return render_template_string(BASE, title="Post", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
 
-@app.route('/complain', methods=["GET","POST"])
-@login_required
-def complain_page(nickname, user):
-    with DBSession() as db:
-        db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname}); db.commit()
-        if request.method=="POST" and request.form.get("text"):
-            cnt = db.execute(sa.text("SELECT COUNT(*) FROM complaints WHERE nickname=:u AND created_at > NOW() - INTERVAL '7 days'"), {"u": nickname}).scalar() or 0
-            if cnt >= 3:
-                return render_template_string(BASE, title="Complain Limit", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><div class=error>❌ You don reach limit - 3 complains per week only.</div><a class=btn blue href=/main>Back</a></div>"), timer_script="")
-            db.execute(sa.text("INSERT INTO complaints (nickname, name, text) VALUES (:u,:n,:t)"), {"u": nickname, "n": user["name"], "t": request.form["text"][:1000]})
-            db.commit()
-            return redirect("/complain")
-        my = db.execute(sa.text("SELECT * FROM complaints WHERE nickname=:u ORDER BY id DESC LIMIT 20"), {"u": nickname}).mappings().all()
-    html = "<div class=card><h2>📩 Complain to Admin (3 per week)</h2><form method=POST><textarea name=text placeholder='Write your complaint...' required maxlength=1000></textarea><button class=btn>Send Complaint</button></form></div><h3>My Complaints</h3>"
-    for c in my:
-        ct12 = format_12h(str(c['created_at']))
-        reply = f"<div style='background:#d4edda;padding:8px;margin-top:5px;border-radius:5px'><b>Admin Reply:</b> {c['reply']}</div>" if c['reply'] else "<small>⏳ Pending...</small>"
-        html+=f"<div class=card><b>📝 {c['text']}</b><br><small>{ct12} - {c['status']}</small>{reply}</div>"
-    return render_template_string(BASE, title="Complain", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
 @app.route('/chat')
 @login_required
 def chat(nickname, user):
     with DBSession() as db:
         db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname}); db.commit()
-        reqs = db.execute(sa.text("SELECT * FROM friend_requests WHERE to_nickname=:u AND status='Pending'"), {"u": nickname}).mappings().all()
-        req_html = ""
-        for r in reqs:
-            req_html+=f"<div class=card><b>{r['from_nickname']}</b> sent you friend request<br><div style='display:flex;gap:8px;justify-content:center'><a class=btn blue href=/accept/{r['from_nickname']} style='width:44%;max-width:160px'>✅ Accept</a><a class=btn red href=/reject/{r['from_nickname']} style='width:44%;max-width:160px'>❌ Reject</a></div></div>"
         friends = user.get('friends', [])
         friend_cards = ""
         verified_list = db.execute(sa.text("SELECT nickname FROM users WHERE is_verified=TRUE")).scalars().all()
         verified_set = set(verified_list)
         for f in friends:
             if f == 'motiz_support':
-                u = db.execute(sa.text("SELECT name FROM users WHERE nickname=:u"), {"u": f}).mappings().first()
-                if u:
-                    friend_cards+=f"<a href=/dm/{f} class=friend-card style='border:3px solid gold;background:linear-gradient(135deg,#fff8e1,#ffe082)'><div class=friend-avatar style='background:gold;color:#0f3460'>✓</div><div><b>MOTIZ SUPPORT</b> <span class=badge style='background:gold;color:#0f3460'>✓ VERIFIED SUPPORT</span><br><small>Official Support</small></div></a>"
+                friend_cards+=f"<a href=/dm/{f} class=friend-card style='border:3px solid gold;background:linear-gradient(135deg,#fff8e1,#ffe082)'><div class=friend-avatar style='background:gold;color:#0f3460'>✓</div><div><b>MOTIZ SUPPORT</b> <span class=badge style='background:gold;color:#0f3460'>✓ VERIFIED SUPPORT</span><br><small>Official Support</small></div></a>"
                 continue
             u = db.execute(sa.text("SELECT name,last_seen FROM users WHERE nickname=:u"), {"u": f}).mappings().first()
             if u:
                 last = format_last_seen(u['last_seen']) if u.get('last_seen') else "Unknown"
                 badge = " <span class=badge style='background:#28a745'>✓ Verified Paid</span>" if f in verified_set else ""
-                friend_cards+=f"<a href=/dm/{f} class=friend-card><div class=friend-avatar>{f[0].upper()}</div><div><b>{u['name']}</b>{badge}<br><small>{last}</small></div></a>"
+                unread = get_unread_per_friend(nickname, f)
+                bell = f" <span style='background:red;color:white;padding:2px 6px;border-radius:10px;font-size:0.7rem'>🔔{unread}</span>" if unread>0 else ""
+                friend_cards+=f"<a href=/dm/{f} class=friend-card><div class=friend-avatar>{f[0].upper()}</div><div><b>{u['name']}</b>{badge}{bell}<br><small>{last}</small></div></a>"
         groups = db.execute(sa.text("SELECT * FROM groups")).mappings().all()
         group_html = ""
         for g in groups:
@@ -716,8 +713,37 @@ def chat(nickname, user):
             except: members=[]
             if nickname in members:
                 group_html+=f"<a href=/group/{g['id']} class=friend-card><div class=friend-avatar>👥</div><div><b>{g['name']}</b><br><small>{len(members)} members</small></div></a>"
-    content = f"{req_html}<h3>Friends ({len([x for x in friends if x!='motiz_support'])})</h3>{friend_cards or '<div class=card><p>No friends yet</p><a class=btn blue href=/me>👤 Go to Me to Add Friends</a></div>'}<h3>Groups</h3>{group_html or '<p>No groups</p>'}<a class=btn blue href=/create_group>➕ Create Group</a>"
+    content = f"<h3>Friends ({len([x for x in friends if x!='motiz_support'])})</h3>{friend_cards or '<div class=card><p>No friends yet</p><a class=btn blue href=/me>👤 Go to Me to Add Friends</a></div>'}<h3>Groups</h3>{group_html or '<p>No groups</p>'}<a class=btn blue href=/create_group>➕ Create Group</a><button class=btn blue onclick='history.back()' style='margin-top:15px'>⬅️ Back</button>"
     return render_template_string(BASE, title="Chat", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
+
+@app.route('/me')
+@login_required
+def me_page(nickname, user):
+    offset = int(request.args.get('offset', 0))
+    with DBSession() as db:
+        db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname}); db.commit()
+        # FRIEND REQUESTS MOVED TO ME PAGE
+        reqs = db.execute(sa.text("SELECT * FROM friend_requests WHERE to_nickname=:u AND status='Pending'"), {"u": nickname}).mappings().all()
+        req_html = ""
+        for r in reqs:
+            req_html+=f"<div class=card><b>{r['from_nickname']}</b> sent you friend request<br><div style='display:flex;gap:8px;justify-content:center'><a class=btn blue href=/accept/{r['from_nickname']} style='width:44%;max-width:160px'>✅ Accept</a><a class=btn red href=/reject/{r['from_nickname']} style='width:44%;max-width:160px'>❌ Reject</a></div></div>"
+        all_users = db.execute(sa.text("SELECT nickname, name, class, is_verified FROM users WHERE nickname!=:u AND nickname!='motiz_support' ORDER BY RANDOM()"), {"u": nickname}).mappings().all()
+        friends = user.get('friends', [])
+        pending_to = [r['to_nickname'] for r in db.execute(sa.text("SELECT to_nickname FROM friend_requests WHERE from_nickname=:u AND status='Pending'"), {"u": nickname}).mappings().all()]
+        filtered = [u for u in all_users if u['nickname'] not in friends and u['nickname'] not in pending_to]
+        batch = filtered[offset:offset+FRIENDS_BATCH]
+        is_verified_badge = " <span class=badge style='background:#28a745'>✓ Verified Paid</span>" if user.get('is_verified') else ""
+        html = f"{req_html}<div class=card style='border:2px solid #28a745'><h2>{user['name']}{is_verified_badge} - {subj_emoji(user['class'])}</h2><p><b>Nickname:</b> {nickname}</p><p><b>Class:</b> {user['class']} {user.get('dept','')}</p><p><b>Referral Link:</b><input class=readonly-box readonly value='{BASE_URL}/register?ref={nickname}'></p><p><b>Referral Bonus:</b> 5 days free per paid referral</p></div><h3>🔍 Add Friends (Scout 5)</h3>"
+        for u in batch:
+            verified_tag = " <span class=badge style='background:#28a745'>✓ Verified</span>" if u['is_verified'] else ""
+            html+=f"<div class=friend-card><div class=friend-avatar>{u['nickname'][0].upper()}</div><div style='flex:1'><b>{u['name']}</b>{verified_tag}<br><small>{u['nickname']} - {u['class']}</small></div><a class=btn blue href=/add_friend/{u['nickname']}?offset={offset} style='width:auto;padding:8px 15px;max-width:80px'>Add</a></div>"
+        next_offset = offset + FRIENDS_BATCH
+        if next_offset < len(filtered):
+            html+=f"<a class='btn orange' href=/me?offset={next_offset}>🔍 Scout - Show Next 5</a>"
+        else:
+            html+=f"<a class=btn gray href=/me?offset=0>🔄 Scout Again From Start</a>"
+        html+=f"<a class=btn red href=/logout style='margin-top:20px'>🚪 Logout</a><button class=btn blue onclick='history.back()'>⬅️ Back</button>"
+    return render_template_string(BASE, title="Me", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
 
 @app.route('/accept/<f>')
 @login_required
@@ -737,7 +763,7 @@ def accept_friend(nickname, user, f):
             db.execute(sa.text("UPDATE users SET friends=:f WHERE nickname=:u"), {"f": json.dumps(f1), "u": nickname})
             db.execute(sa.text("UPDATE users SET friends=:f WHERE nickname=:u"), {"f": json.dumps(f2), "u": f})
             db.commit()
-    return redirect("/chat")
+    return redirect("/me")
 
 @app.route('/reject/<f>')
 @login_required
@@ -745,7 +771,7 @@ def reject_friend(nickname, user, f):
     with DBSession() as db:
         db.execute(sa.text("UPDATE friend_requests SET status='Rejected' WHERE from_nickname=:f AND to_nickname=:u AND status='Pending'"), {"f": f, "u": nickname})
         db.commit()
-    return redirect("/chat")
+    return redirect("/me")
 
 @app.route('/add_friend/<f>')
 @login_required
@@ -758,31 +784,6 @@ def add_friend(nickname, user, f):
             db.execute(sa.text("INSERT INTO friend_requests (from_nickname, to_nickname) VALUES (:u,:f)"), {"u": nickname, "f": f})
             db.commit()
     return redirect("/me?offset="+request.args.get('offset','0'))
-
-@app.route('/me')
-@login_required
-def me_page(nickname, user):
-    offset = int(request.args.get('offset', 0))
-    with DBSession() as db:
-        db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname}); db.commit()
-        all_users = db.execute(sa.text("SELECT nickname, name, class, is_verified FROM users WHERE nickname!=:u AND nickname!='motiz_support' ORDER BY RANDOM()"), {"u": nickname}).mappings().all()
-        friends = user.get('friends', [])
-        pending_to = [r['to_nickname'] for r in db.execute(sa.text("SELECT to_nickname FROM friend_requests WHERE from_nickname=:u AND status='Pending'"), {"u": nickname}).mappings().all()]
-        filtered = [u for u in all_users if u['nickname'] not in friends and u['nickname'] not in pending_to]
-        batch = filtered[offset:offset+FRIENDS_BATCH]
-        is_verified_badge = " <span class=badge style='background:#28a745'>✓ Verified Paid</span>" if user.get('is_verified') else ""
-        html = f"<div class=card style='border:2px solid #28a745'><h2>{user['name']}{is_verified_badge} - {subj_emoji(user['class'])}</h2><p><b>Nickname:</b> {nickname}</p><p><b>Class:</b> {user['class']} {user.get('dept','')}</p><p><b>Referral Link:</b><input class=readonly-box readonly value='{BASE_URL}/register?ref={nickname}'></p><p><b>Referral Bonus:</b> 5 days free per paid referral</p></div><h3>🔍 Add Friends (Scout 5)</h3>"
-        for u in batch:
-            verified_tag = " <span class=badge style='background:#28a745'>✓ Verified</span>" if u['is_verified'] else ""
-            html+=f"<div class=friend-card><div class=friend-avatar>{u['nickname'][0].upper()}</div><div style='flex:1'><b>{u['name']}</b>{verified_tag}<br><small>{u['nickname']} - {u['class']}</small></div><a class=btn blue href=/add_friend/{u['nickname']}?offset={offset} style='width:auto;padding:8px 15px;max-width:80px'>Add</a></div>"
-        next_offset = offset + FRIENDS_BATCH
-        if next_offset < len(filtered):
-            html+=f"<a class='btn orange' href=/me?offset={next_offset}>🔍 Scout - Show Next 5</a>"
-        else:
-            html+=f"<a class=btn gray href=/me?offset=0>🔄 Scout Again From Start</a>"
-        html+=f"<a class=btn red href=/logout style='margin-top:20px'>🚪 Logout</a><a class=btn blue href=/chat>💬 Back to Chat</a>"
-    return render_template_string(BASE, title="Me", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
-
 @app.route('/dm/<other>', methods=["GET","POST"])
 @login_required
 def dm_page(nickname, user, other):
@@ -790,6 +791,15 @@ def dm_page(nickname, user, other):
         db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname}); db.commit()
         other_user = db.execute(sa.text("SELECT * FROM users WHERE nickname=:o"), {"o": other}).mappings().first()
         if not other_user: return redirect("/chat")
+
+        # DELETE MESSAGE
+        del_id = request.args.get('del_msg')
+        if del_id:
+            msg = db.execute(sa.text("SELECT from_nickname FROM dms WHERE id=:i"), {"i": int(del_id)}).scalar()
+            if msg == nickname or nickname == 'motiz_support':
+                db.execute(sa.text("DELETE FROM dms WHERE id=:i"), {"i": int(del_id)}); db.commit()
+            return redirect(f"/dm/{other}")
+
         all_dms = db.execute(sa.text("SELECT * FROM dms WHERE (from_nickname=:u AND to_nickname=:o) OR (from_nickname=:o AND to_nickname=:u) ORDER BY id ASC"), {"u": nickname, "o": other}).mappings().all()
         for m in all_dms:
             if m['to_nickname']==nickname:
@@ -803,11 +813,17 @@ def dm_page(nickname, user, other):
                 if changed:
                     db.execute(sa.text("UPDATE dms SET read_by=:r, delivered_to=:d WHERE id=:i"), {"r": json.dumps(read_by), "d": json.dumps(delivered), "i": m['id']})
         db.commit()
+
         if request.method=="POST" and request.form.get("text"):
-            db.execute(sa.text("INSERT INTO dms (from_nickname, to_nickname, text, time) VALUES (:f,:t,:txt,:tm)"), {"f": nickname, "t": other, "txt": request.form["text"][:1000], "tm": str(datetime.now(NIGERIA_TZ))})
+            txt = request.form["text"][:700]
+            reply_to = request.form.get("reply_to","")[:200]
+            full_text = f"↩️ Reply to: {reply_to}\n{txt}" if reply_to else txt
+            db.execute(sa.text("INSERT INTO dms (from_nickname, to_nickname, text, time) VALUES (:f,:t,:txt,:tm)"), {"f": nickname, "t": other, "txt": full_text, "tm": str(datetime.now(NIGERIA_TZ))})
             db.commit()
             return redirect(f"/dm/{other}")
+
         dms = db.execute(sa.text("SELECT * FROM dms WHERE (from_nickname=:u AND to_nickname=:o) OR (from_nickname=:o AND to_nickname=:u) ORDER BY id ASC"), {"u": nickname, "o": other}).mappings().all()
+
     chat_html = ""
     for m in dms:
         is_me = m['from_nickname']==nickname
@@ -825,9 +841,17 @@ def dm_page(nickname, user, other):
         else:
             tick = ""
         cls = "me" if is_me else "other"
-        # FIX 1: 12hr time for DM
         t12 = format_12h(m['time'])
-        chat_html+=f"<div class='chat-msg {cls}'><div class='bubble {cls}'><div class='bubble-text'>{m['text']}</div><div class='bubble-time'>{t12} {tick}</div></div></div>"
+        # Format reply
+        text_display = m['text'].replace("\n","<br>")
+        if "↩️ Reply to:" in m['text']:
+            parts = m['text'].split("\n",1)
+            text_display = f"<div style='background:rgba(0,0,0,0.1);padding:5px;border-radius:5px;margin-bottom:5px;font-size:0.8rem;border-left:3px solid #0f3460'>{parts[0]}</div>{parts[1] if len(parts)>1 else ''}"
+
+        # WHATSAPP LIKE: Long press menu for delete/reply/copy
+        chat_html+=f"""<div class='chat-msg {cls}' oncontextmenu="showMenu(event,{m['id']},'{m['text'][:100].replace("'','').replace('\"','')}'); return false;" onclick="showMenu(event,{m['id']},'{m['text'][:100].replace("'','').replace('\"','')}')">
+        <div class='bubble {cls}' id='msg-{m['id']}'><div class='bubble-text'>{text_display}</div><div class='bubble-time'>{t12} {tick}</div></div></div>"""
+
     timer_js = Markup(f"""
     setTimeout(()=>{{ window.scrollTo(0, document.body.scrollHeight); }}, 300);
     let lastCount = {len(dms)};
@@ -836,25 +860,48 @@ def dm_page(nickname, user, other):
             if(data.count > lastCount){{
                 try{{
                     let ctx = new (window.AudioContext || window.webkitAudioContext)();
-                    let o = ctx.createOscillator();
-                    let g = ctx.createGain();
-                    o.type='sine'; o.frequency.value=800;
-                    o.connect(g); g.connect(ctx.destination);
-                    g.gain.setValueAtTime(0.5, ctx.currentTime);
-                    o.start(); g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+0.3);
-                    o.stop(ctx.currentTime+0.3);
+                    let o = ctx.createOscillator(); let g = ctx.createGain();
+                    o.type='sine'; o.frequency.value=800; o.connect(g); g.connect(ctx.destination);
+                    g.gain.setValueAtTime(0.5, ctx.currentTime); o.start(); g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+0.3); o.stop(ctx.currentTime+0.3);
+                    // PUSH NOTIFICATION IF APP INSTALLED AND USER NOT IN CHAT
+                    if(Notification.permission==='granted' && document.hidden){{
+                        navigator.serviceWorker.ready.then(reg=>{{
+                            reg.showNotification('New message from {other}', {{body: 'You have a new message', icon:'{FAVICON_URL}', vibrate:[200,100,200]}});
+                        }});
+                    }}
                 }}catch(e){{}}
                 location.reload();
             }}
         }});
     }}, 3000);
+
+    let replyText = '';
+    function showMenu(e, id, text){{
+        e.preventDefault();
+        let menu = document.getElementById('msgMenu');
+        if(!menu){{
+            menu = document.createElement('div');
+            menu.id='msgMenu';
+            menu.style='position:fixed;background:white;border:1px solid #ccc;border-radius:8px;padding:5px;z-index:10000;box-shadow:0 4px 10px rgba(0,0,0,0.2)';
+            document.body.appendChild(menu);
+        }}
+        menu.innerHTML = `<button onclick="doReply(${{id}},'${{text}}')" class=btn blue style='padding:5px;margin:2px'>↩️ Reply</button><button onclick="doCopy('${{text}}')" class=btn gray style='padding:5px;margin:2px'>📋 Copy</button><button onclick="doDelete(${{id}})" class=btn red style='padding:5px;margin:2px'>🗑️ Delete</button><button onclick="this.parentElement.style.display='none'" class=btn gray style='padding:5px;margin:2px'>X</button>`;
+        menu.style.left = e.pageX+'px'; menu.style.top = e.pageY+'px'; menu.style.display='block';
+    }}
+    function doReply(id, text){{ replyText=text; document.getElementById('replyPreview').style.display='flex'; document.getElementById('replyPreviewText').innerText=text.substring(0,50); document.getElementById('replyToInput').value=text; document.getElementById('msgMenu').style.display='none'; }}
+    function doCopy(text){{ navigator.clipboard.writeText(text); document.getElementById('msgMenu').style.display='none'; alert('Copied!'); }}
+    function doDelete(id){{ if(confirm('Delete this message?')){{ window.location.href='/dm/{other}?del_msg='+id; }} }}
+    function cancelReply(){{ document.getElementById('replyPreview').style.display='none'; document.getElementById('replyToInput').value=''; replyText=''; }}
+    document.addEventListener('click', function(e){{ if(!e.target.closest('#msgMenu') &&!e.target.closest('.bubble')){{ let m=document.getElementById('msgMenu'); if(m) m.style.display='none'; }} }});
     """)
+
     verified_badge = ""
     if other == 'motiz_support':
         verified_badge = " <span class=badge style='background:gold;color:#0f3460'>✓ MOTIZ SUPPORT VERIFIED</span>"
     elif other_user.get('is_verified'):
         verified_badge = " <span class=badge style='background:#28a745'>✓ Verified Paid</span>"
-    content = f"<h3>💬 {other_user['name']}{verified_badge} ({format_last_seen(other_user.get('last_seen'))}) - {subj_emoji(other_user.get('class',''))}</h3><div id=chatBox>{chat_html}</div><form method=POST class=chat-input-fixed><input name=text placeholder='Type message...' required autocomplete=off><button class=send-img-btn><img src={SEND_BTN_URL}></button></form><a class=btn blue href=/chat style='margin-bottom:100px'>⬅️ Back</a>"
+
+    content = f"<h3>💬 {other_user['name']}{verified_badge} ({format_last_seen(other_user.get('last_seen'))})</h3><div id=chatBox>{chat_html}</div><form method=POST class=chat-input-fixed><div id=replyPreview class=reply-preview style='display:none'><span id=replyPreviewText></span><button type=button onclick='cancelReply()' style='background:red;color:white;border:none;border-radius:50%;width:20px'>X</button></div><input type=hidden name=reply_to id=replyToInput><div style='display:flex;gap:5px'><input name=text id=chatInput placeholder='Type message... (max 700)' required autocomplete=off maxlength=700 style='flex:1'><button class=send-img-btn><img src={SEND_BTN_URL}></button></div></form><button class=btn blue onclick='history.back()' style='margin-bottom:120px'>⬅️ Back</button><div id=msgMenu style='display:none'></div>"
     return render_template_string(BASE, title=f"Chat {other}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
 
 @app.route('/check_dm/<other>')
@@ -868,13 +915,13 @@ def check_dm(nickname, user, other):
 @login_required
 def create_group(nickname, user):
     if request.method=="POST":
-        name = request.form.get("name","").strip()
+        name = request.form.get("name","").strip()[:50]
         if name:
             with DBSession() as db:
                 db.execute(sa.text("INSERT INTO groups (name, creator, members) VALUES (:n,:c,:m)"), {"n": name, "c": nickname, "m": json.dumps([nickname])})
                 db.commit()
             return redirect("/chat")
-    return render_template_string(BASE, title="Create Group", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>Create Group</h2><form method=POST><input name=name placeholder='Group Name' required><button class=btn>Create Group</button></form><a class=btn blue href=/chat>Back</a></div>"), timer_script="")
+    return render_template_string(BASE, title="Create Group", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>Create Group</h2><form method=POST><input name=name placeholder='Group Name' required maxlength=50><button class=btn>Create Group</button></form><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"), timer_script="")
 
 @app.route('/group/<int:gid>', methods=["GET","POST"])
 @login_required
@@ -900,28 +947,24 @@ def group_page(nickname, user, gid):
         if request.method=="POST" and request.form.get("text"):
             try: msgs=json.loads(g['messages'] or '[]')
             except: msgs=[]
-            msgs.append({"from": nickname, "name": user['name'], "text": request.form["text"][:1000], "time": str(datetime.now(NIGERIA_TZ))})
+            msgs.append({"from": nickname, "name": user['name'], "text": request.form["text"][:700], "time": str(datetime.now(NIGERIA_TZ))})
             db.execute(sa.text("UPDATE groups SET messages=:m WHERE id=:i"), {"m": json.dumps(msgs), "i": gid}); db.commit()
             return redirect(f"/group/{gid}")
         try: msgs=json.loads(g['messages'] or '[]')
         except: msgs=[]
         friends_to_add = [f for f in user.get('friends', []) if f not in members and f!= 'motiz_support']
         friends_options = "".join([f"<a class=btn blue href=/group/{gid}?add_member={f} style='margin:3px;width:auto;padding:6px 10px;font-size:0.8rem;display:inline-block;max-width:120px'>➕ Add {f}</a>" for f in friends_to_add])
-    html = f"<div class=card><h3>👥 {g['name']}</h3><p>Creator: {g['creator']} | Members: {len(members)}</p></div>"
-    html += "<div class=card><h4>Members:</h4>"
-    for m in members:
-        if m == 'motiz_support': continue
-        remove_btn = f" <a class=btn red href=/group/{gid}?remove_member={m} style='display:inline-block;width:auto;padding:3px 8px;font-size:0.7rem;margin-left:5px;max-width:70px'>Remove</a>" if g['creator']==nickname and m!=nickname else ""
-        html+=f"<div style='padding:5px;border-bottom:1px solid #eee'><b>{m}</b>{remove_btn}</div>"
-    html+="</div>"
+
+    # HIDE GROUP MEMBERS AS YOU REQUESTED - Only show count, not full list
+    html = f"<div class=card><h3>👥 {g['name']}</h3><p>Creator: {g['creator']} | Members: {len(members)} <small>(hidden for privacy)</small></p></div>"
     if friends_to_add:
         html+=f"<div class=card><h4>Add Members (Friends only):</h4>{friends_options}</div>"
     for m in msgs:
         is_me = m['from']==nickname
         cls = "me" if is_me else "other"
         t12 = format_12h(m.get('time',''))
-        html+=f"<div class='chat-msg {cls}'><div class='bubble-text'><b>{m['name']}</b><br>{m['text']}</div><div class='bubble-time'>{t12}</div></div></div>"
-    html+=f"<form method=POST class=chat-input-fixed><input name=text placeholder='Type message...' required><button class=send-img-btn><img src={SEND_BTN_URL}></button></form><a class=btn blue href=/chat style='margin-bottom:100px'>Back to Chat</a>"
+        html+=f"<div class='chat-msg {cls}'><div class='bubble {cls}'><b>{m['name']}</b><br>{m['text']}<div class='bubble-time'>{t12}</div></div></div>"
+    html+=f"<form method=POST class=chat-input-fixed><input name=text placeholder='Type message... (max 700)' required maxlength=700><button class=send-img-btn><img src={SEND_BTN_URL}></button></form><button class=btn blue onclick='history.back()' style='margin-bottom:100px'>⬅️ Back</button>"
     return render_template_string(BASE, title=g['name'], header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
 
 @app.route('/admin', methods=["GET","POST"])
@@ -939,12 +982,10 @@ def admin(nickname, user):
     l_target = request.args.get('l_target')
     manage = request.args.get('manage')
     edit_notice_id = request.args.get('edit_notice')
-
     with DBSession() as db:
         pending_reqs = db.execute(sa.text("SELECT * FROM payments WHERE status='Pending' ORDER BY id DESC")).mappings().all()
         complaints_pending = db.execute(sa.text("SELECT * FROM complaints ORDER BY id DESC LIMIT 50")).mappings().all()
         complaints_count = db.execute(sa.text("SELECT COUNT(*) FROM complaints WHERE status='Pending'")).scalar() or 0
-
     if request.method=="POST":
         with DBSession() as db:
             try:
@@ -1027,6 +1068,7 @@ def admin(nickname, user):
                     set_setting("notices", json.dumps(NOTICES)); error = "<div class=success>Notice Updated</div>"
                 if "delete_notice" in request.form:
                     nid = int(request.form["notice_id"])
+                    global NOTICES
                     NOTICES = [n for n in NOTICES if n.get('id')!=nid]
                     set_setting("notices", json.dumps(NOTICES)); error = "<div class=error>Notice Deleted</div>"
                 if "pin_notice" in request.form:
@@ -1036,9 +1078,7 @@ def admin(nickname, user):
                 error = f"<div class=error>Error: {str(e)}</div>"
                 try: db.rollback()
                 except: pass
-
     pending_html = "".join([f"<div class='card'><b>{r['name']} (@{r['nickname']})</b> for {r['type']}<br><small>Bank: {r['bank_used']} | Acc: {r['account_name']}</small><div style='display:flex;gap:8px;justify-content:center'><form method=POST style='flex:1'><input type=hidden name=verify_id value={r['id']}><button class='btn' style='width:95%;max-width:150px'>✅ Verify +5 Days</button></form><form method=POST style='flex:1'><input type=hidden name=deny_id value={r['id']}><button class='btn red' style='width:95%;max-width:150px'>❌ Deny</button></form></div></div>" for r in pending_reqs])
-
     complaints_html = ""
     for c in complaints_pending:
         ct12 = format_12h(str(c['created_at']))
@@ -1049,14 +1089,12 @@ def admin(nickname, user):
         reply_form += f"<form method=POST><input type=hidden name=complaint_id value={c['id']}><button name=delete_complaint class='btn red'>🗑️ Delete</button></form>"
         complaints_html+=f"<div class=card><b>{c['name']} (@{c['nickname']}) - {c['status']}</b><p>{c['text']}</p><small>{ct12}</small>{reply_form}</div>"
     if not complaints_html: complaints_html="<p>No complaints</p>"
-
     manage_notice_html = ""
     for n in NOTICES:
         nid = n.get('id', 0)
         safe_title = n['title'].replace('"', '&quot;')
         safe_text = n['text'][:100].replace('"', '&quot;')
         manage_notice_html+=f'<div class=card><b>📢 {safe_title}</b><p>{safe_text}...</p><a class="btn blue" href="/admin?edit_notice={nid}">✏️ Edit</a><form method=POST><input type=hidden name=notice_id value="{nid}"><button name=delete_notice class="btn red">🗑️ Delete</button></form><form method=POST><input type=hidden name=notice_title value="{safe_title}"><input type=hidden name=notice_text value="{safe_text}"><button name=pin_notice class="btn orange">📌 Pin</button></form></div>'
-
     keys = ["JSS1","JSS2","JSS3","SS1_Science","SS1_Commercial","SS1_Art","SS2_Science","SS2_Commercial","SS2_Art","SS3_Science","SS3_Commercial","SS3_Art"]
     labels = ["JSS1","JSS2","JSS3","SS1 Science","SS1 Commercial","SS1 Art","SS2 Science","SS2 Commercial","SS2 Art","SS3 Science","SS3 Commercial","SS3 Art"]
     group1 = ""; group2 = ""
@@ -1064,7 +1102,6 @@ def admin(nickname, user):
         group1 += f"<a href=/admin?q_target={k} class='btn blue cbt-btn-fix'>➕ Add Q: {l}</a>"
         group1 += f"<a href=/admin?q_target={k}&bulk=1 class='btn orange cbt-btn-fix'>📦 Bulk Q: {l}</a>"
         group2 += f"<a href=/admin?l_target={k} class='btn blue cbt-btn-fix'>➕ Add Lesson: {l}</a>"
-
     add_q_form = ""; bulk_form = ""
     if q_target:
         subs = SUBJECTS.get(q_target, [])
@@ -1085,7 +1122,6 @@ def admin(nickname, user):
             if note:
                 edit_notice_form = f"<div class=card><h3>✏️ Edit Notice</h3><form method=POST><input type=hidden name=notice_id value={note['id']}><input name=notice_title value=\"{note['title']}\" required><textarea name=notice_text required>{note['text']}</textarea><input name=media_link value=\"{note.get('media_link','')}\"><button name=edit_notice class='btn blue'>Update</button></form></div>"
         except: pass
-
     manage_html = ""
     if manage == "questions":
         with DBSession() as db: questions = db.execute(sa.text("SELECT * FROM questions ORDER BY id DESC LIMIT 100")).mappings().all()
@@ -1093,19 +1129,18 @@ def admin(nickname, user):
         for q in questions:
             try: opts = json.loads(q['options'])
             except: opts = ["","","",""]
-            q_list += f"<div class=card><b>{q['key']} {subj_emoji(q['key'])}</b><p>{q['q']}</p><small>A:{opts[0]} B:{opts[1]} C:{opts[2]} D:{opts[3]} | Ans:{q['ans']}</small><form method=POST style='margin-top:8px'><input type=hidden name=qid value={q['id']}><input name=q value=\"{q['q']}\" required><input name=a value=\"{opts[0]}\" required><input name=b value=\"{opts[1]}\" required><input name=c value=\"{opts[2]}\" required><input name=d value=\"{opts[3]}\" required><select name=correct_ans><option value=0 {'selected' if q['ans']==opts[0] else ''}>A is Correct</option><option value=1 {'selected' if q['ans']==opts[1] else ''}>B is Correct</option><option value=2 {'selected' if q['ans']==opts[2] else ''}>C is Correct</option><option value=3 {'selected' if q['ans']==opts[3] else ''}>D is Correct</option></select><div style='display:flex;gap:5px;justify-content:center'><button name=edit_question class='btn blue' style='flex:1;max-width:140px'>✏️ Save Edit</button><button name=delete_question class='btn red' style='flex:1;max-width:140px'>🗑️ Delete</button></div></form></div>"
-        manage_html = f"<div class=card><h2>📝 Manage Questions (Card Buttons)</h2>{q_list or '<p>No questions</p>'}</div>"
+            q_list += f"<div class=card><b>{q['key']}</b><p>{q['q']}</p><small>A:{opts[0]} B:{opts[1]} C:{opts[2]} D:{opts[3]} | Ans:{q['ans']}</small><form method=POST style='margin-top:8px'><input type=hidden name=qid value={q['id']}><input name=q value=\"{q['q']}\" required><input name=a value=\"{opts[0]}\" required><input name=b value=\"{opts[1]}\" required><input name=c value=\"{opts[2]}\" required><input name=d value=\"{opts[3]}\" required><select name=correct_ans><option value=0 {'selected' if q['ans']==opts[0] else ''}>A is Correct</option><option value=1 {'selected' if q['ans']==opts[1] else ''}>B is Correct</option><option value=2 {'selected' if q['ans']==opts[2] else ''}>C is Correct</option><option value=3 {'selected' if q['ans']==opts[3] else ''}>D is Correct</option></select><div style='display:flex;gap:5px;justify-content:center'><button name=edit_question class='btn blue' style='flex:1;max-width:140px'>✏️ Save Edit</button><button name=delete_question class='btn red' style='flex:1;max-width:140px'>🗑️ Delete</button></div></form></div>"
+        manage_html = f"<div class=card><h2>📝 Manage Questions</h2>{q_list or '<p>No questions</p>'}</div>"
     elif manage == "lessons":
         with DBSession() as db: lessons = db.execute(sa.text("SELECT * FROM lessons ORDER BY id DESC LIMIT 50")).mappings().all()
         l_list = ""
         for l in lessons:
-            l_list += f"<div class=card><b>{l['class']} {l['dept']} - {l['subject']}</b><p>{l['title']}</p><form method=POST><input type=hidden name=lid value={l['id']}><input name=lesson_title value=\"{l['title']}\" required><textarea name=lesson_notes required>{l['notes']}</textarea><input name=media_link value=\"{l.get('media_link','')}\"><div style='display:flex;gap:5px;justify-content:center'><button name=edit_lesson class='btn blue' style='flex:1;max-width:140px'>✏️ Update Lesson</button><button name=delete_lesson class='btn red' style='flex:1;max-width:140px'>🗑️ Delete Lesson</button></div></form></div>"
+            l_list += f"<div class=card><b>{l['class']} {l['dept']} - {l['subject']}</b><p>{l['title']}</p><form method=POST><input type=hidden name=lid value={l['id']}><input name=lesson_title value=\"{l['title']}\" required><textarea name=lesson_notes required>{l['notes']}</textarea><input name=media_link value=\"{l.get('media_link','')}\"><div style='display:flex;gap:5px;justify-content:center'><button name=edit_lesson class='btn blue' style='flex:1;max-width:140px'>✏️ Update</button><button name=delete_lesson class='btn red' style='flex:1;max-width:140px'>🗑️ Delete</button></div></form></div>"
         manage_html = f"<div class=card><h2>📚 Manage Lessons</h2>{l_list or '<p>No lessons</p>'}</div>"
     elif manage == "notices":
         manage_html = f"<div class=card><h2>📢 Manage Notices</h2>{manage_notice_html or '<p>No notices</p>'}</div>"
     elif manage == "complaints":
         manage_html = f"<div class=card><h2>📩 Complaints Inbox ({complaints_count} Pending)</h2>{complaints_html}</div>"
-
     form = f"""<div class="card"><h2>Admin Panel V33 FINAL FIXED - NO CRASH</h2>{error}{bulk_result}</div>
 {edit_notice_form}{add_q_form}{bulk_form}{add_l_form}{manage_html}
 <div class="card"><h2>📝 GROUP 1: CBT QUESTIONS</h2><div style="display:flex;flex-direction:column;gap:8px">{group1}</div></div>
@@ -1113,7 +1148,7 @@ def admin(nickname, user):
 <div class="card"><h2>⚙️ GROUP 3: MANAGE</h2><a href=/admin?manage=questions class='btn blue'>📝 Manage Questions</a><a href=/admin?manage=lessons class='btn blue'>📚 Manage Lessons</a><a href=/admin?manage=notices class='btn orange'>📢 Manage Notices</a><a href=/admin?manage=complaints class='btn red'>📩 Complaints ({complaints_count})</a></div>
 <div class="card"><h2>👥 GROUP 4: PAYMENTS + POST NOTICE</h2>{pending_html or "<p>No pending</p>"}<a href=/admin_attendance class='btn blue'>👥 Attendance + Referrals</a><form method=POST style="margin-top:15px"><h3>Post Notice</h3><input name=notice_title placeholder="Title" required><textarea name=notice_text placeholder="Message" required></textarea><input name=media_link placeholder="Imgur link"><button name=post_notice class='btn'>📢 Post Notice</button></form></div>
 <div class="card"><h2>🛑 DANGER ZONE</h2><form method=POST onsubmit="return confirm('Delete ALL?')"><button name=clear_all_data class='btn red'>⚠️ Clear All</button></form></div>
-<div class="card"><h2>🔒 GROUP 5: SETTINGS</h2><form method="POST"><input type="password" name="old_pass" placeholder="Current" required><input type="password" name="new_pass" placeholder="New" required><button name="change_pass" class='btn orange'>🔒 Change Pass</button></form></div>"""
+<div class="card"><h2>🔒 GROUP 5: SETTINGS</h2><form method="POST"><input type="password" name="old_pass" placeholder="Current" required><input type="password" name="new_pass" placeholder="New" required><button name="change_pass" class='btn orange'>🔒 Change Pass</button></form><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"""
     return render_template_string(BASE, title="Admin V33", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(form), timer_script="")
 
 @app.route('/admin_attendance')
@@ -1126,9 +1161,8 @@ def admin_attendance(nickname, user):
     for u in users:
         ls_text = format_last_seen(u['last_seen']) if u['last_seen'] else "Never"
         verified_icon = "✅ Verified Paid" if u['is_verified'] else "Free"
-        # 12hr for last seen is already handled
         table += f"<tr><td>{u['name']}<br><small>@{u['nickname']}</small> {verified_icon}</td><td>{u['class']} {u.get('dept','') or ''}</td><td>{u['q_used']}</td><td>{verified_icon}</td><td>{u['lesson_expiry'] or 'None'}</td><td>{ls_text}</td><td>{u['referral_count'] or 0}</td><td>{u['free_days'] or 0}</td></tr>"
-    content = f"<div class=card><h2>Attendance V33 FINAL</h2><p>Total: {len(users)}</p><div style='overflow-x:auto'><table style='width:100%;font-size:0.75rem;border-collapse:collapse' border=1><tr><th>Name</th><th>Class</th><th>Q Used</th><th>Status</th><th>Expiry</th><th>Last Seen</th><th>Refs</th><th>Free Days</th></tr>{table}</table></div><a class='btn blue' href=/admin>⬅️ Back</a></div>"
+    content = f"<div class=card><h2>Attendance V33 FINAL</h2><p>Total: {len(users)}</p><div style='overflow-x:auto'><table style='width:100%;font-size:0.75rem;border-collapse:collapse' border=1><tr><th>Name</th><th>Class</th><th>Q Used</th><th>Status</th><th>Expiry</th><th>Last Seen</th><th>Refs</th><th>Free Days</th></tr>{table}</table></div><button class='btn blue' onclick='history.back()'>⬅️ Back</button></div>"
     return render_template_string(BASE, title="Attendance V33", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
 if __name__ == '__main__':
