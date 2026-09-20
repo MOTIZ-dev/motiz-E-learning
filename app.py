@@ -1163,7 +1163,7 @@ def admin(nickname, user):
         manage_html = f"<div class=card><h2>📢 Manage Notices</h2>{manage_notice_html or '<p>No notices</p>'}</div>"
     elif manage == "complaints":
         manage_html = f"<div class=card><h2>📩 Complaints Inbox ({complaints_count} Pending)</h2>{complaints_html}</div>"
-        html = f"""
+            html = f"""
     {edit_notice_form}{add_q_form}{bulk_form}{add_l_form}{manage_html}
     <div class="card"><h2>GROUP 1: CBT QUESTIONS</h2><div style="display:flex;flex-direction:column;gap:8px">{group1}</div></div>
     <div class="card"><h2>GROUP 2: LESSONS</h2><div style="display:flex;flex-direction:column;gap:8px">{group2}</div></div>
@@ -1174,8 +1174,7 @@ def admin(nickname, user):
     """
     return render_template_string(BASE.replace("__HEADER__", get_header(nickname, user)).replace("__CONTENT__", html), nickname=nickname, user=user)
 
-@app.route('/admin_attendance')
-@login_required
+@app.route("/admin_attendance")
 def admin_attendance(nickname, user):
     if not session.get("admin_logged_in"): return redirect("/admin")
     with DBSession() as db:
