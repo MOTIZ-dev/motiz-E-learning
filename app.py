@@ -172,7 +172,6 @@ def format_last_seen(dt):
         days = hours // 24
         return f"{days}d ago"
     except: return "Unknown"
-
 def format_12h(time_str):
     try:
         if not time_str: return ""
@@ -427,7 +426,6 @@ def main(nickname, user):
 def logout():
     session.clear()
     return redirect("/login")
-
 @app.route('/exam')
 @login_required
 def exam(nickname, user):
@@ -629,7 +627,6 @@ def community(nickname, user):
         if b == "":
             bg_html += f"<div class='bg-option' data-bg='' style='background:white;border:1px solid #ccc' onclick=\"selectBg(this,'')\"></div>"
         else:
-            # use double quotes for data, single for onclick param to avoid break
             safe_b = b.replace('"', '&quot;')
             bg_html += f"<div class='bg-option' data-bg=\"{safe_b}\" style='background:{b}' onclick=\"selectBg(this, '{b}')\"></div>"
     html = f"""<div class=card>
@@ -663,7 +660,6 @@ def community(nickname, user):
         except: comments=[]
         is_motiz = p['nickname']=='motiz_support'
         is_author = p['nickname']==nickname
-        # FIX 3: HIDE PAID STATUS - only MOTIZ SUPPORT gets badge/gold border, others get normal card
         if is_motiz:
             style = "style='border:3px solid gold;background:linear-gradient(135deg,#fff8e1,#ffe082)'"
             badge_html = " <span class=badge gold>✓ MOTIZ SUPPORT VERIFIED</span> <span style=background:gold;padding:2px 5px;border-radius:5px;font-size:0.6rem;color:#0f3460;font-weight:bold;white-space:nowrap>ADMIN</span>"
@@ -674,7 +670,6 @@ def community(nickname, user):
         t12 = format_12h(str(p['created_at']))
         del_btn = f"<a class=btn red href='/community?del_post={p['id']}' onclick=\"return confirm('Delete this post?')\" style='padding:6px;font-size:0.8rem;margin:5px 0;width:90%;max-width:280px'>🗑️ Delete</a>" if (is_author or nickname=='motiz_support') else ""
         text_html = f"<div class='community-bg-post' style='background:{bg_val}'>{p['text']}</div>" if bg_val else f"<p>{p['text']}</p>"
-        # FIX 4: SMALL LIKE/COMMENT ON ONE LINE
         html+=f"<div class=card {style}><b>{p['name']}</b>{badge_html}<br><small>{t12}</small>{text_html}{del_btn}<div class=like-row><a class='btn gray' href='/like/{p['id']}' style='flex:1;padding:6px 8px;font-size:0.8rem;margin:0'>👍 Like ({len(likes)})</a><a class='btn gray' href='/post/{p['id']}' style='flex:1;padding:6px 8px;font-size:0.8rem;margin:0'>💬 Comment ({len(comments)})</a></div></div>"
     return render_template_string(BASE, title="Community", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
 
@@ -731,7 +726,6 @@ def chat(nickname, user):
                 last = format_last_seen(u['last_seen']) if u.get('last_seen') else "Unknown"
                 unread = get_unread_per_friend(nickname, f)
                 bell = f" <span style='background:red;color:white;padding:2px 6px;border-radius:10px;font-size:0.7rem'>🔔{unread}</span>" if unread>0 else ""
-                # FIX 3: NO VERIFIED BADGE FOR FRIENDS - HIDDEN FOR PRIVACY
                 friend_cards+=f"<a href=/dm/{f} class=friend-card><div class=friend-avatar>{f[0].upper()}</div><div><b>{u['name']}</b>{bell}<br><small>{last}</small></div></a>"
         groups = db.execute(sa.text("SELECT * FROM groups")).mappings().all()
         group_html = ""
@@ -761,7 +755,6 @@ def me_page(nickname, user):
         is_verified_badge = " <span class=badge style='background:#28a745;white-space:nowrap'>✓ Verified Paid</span>" if user.get('is_verified') else ""
         html = f"{req_html}<div class=card style='border:2px solid #28a745'><h2>{user['name']}{is_verified_badge} - {subj_emoji(user['class'])}</h2><p><b>Nickname:</b> {nickname}</p><p><b>Class:</b> {user['class']} {user.get('dept','')}</p><p><b>Referral Link:</b><input class=readonly-box readonly value='{BASE_URL}/register?ref={nickname}'></p><p><b>Referral Bonus:</b> 5 days free per paid referral</p></div><h3>🔍 Add Friends (Scout 5)</h3>"
         for u in batch:
-            # FIX 3: HIDE OTHER USERS PAID STATUS - NO BADGE HERE
             html+=f"<div class=friend-card><div class=friend-avatar>{u['nickname'][0].upper()}</div><div style='flex:1'><b>{u['name']}</b><br><small>{u['nickname']} - {u['class']}</small></div><a class=btn blue href=/add_friend/{u['nickname']}?offset={offset} style='width:auto;padding:8px 15px;max-width:80px'>Add</a></div>"
         next_offset = offset + FRIENDS_BATCH
         if next_offset < len(filtered):
@@ -770,6 +763,7 @@ def me_page(nickname, user):
             html+=f"<a class=btn gray href=/me?offset=0>🔄 Scout Again From Start</a>"
         html+=f"<a class=btn red href=/logout style='margin-top:20px'>🚪 Logout</a>"
     return render_template_string(BASE, title="Me", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
+
 @app.route('/accept/<f>')
 @login_required
 def accept_friend(nickname, user, f):
@@ -842,7 +836,6 @@ def dm_page(nickname, user, other):
             full_text = f"Reply to: {reply_to}\n{txt}" if reply_to else txt
             db.execute(sa.text("INSERT INTO dms (from_nickname, to_nickname, text, time) VALUES (:f,:t,:txt,:tm)"), {"f": nickname, "t": other, "txt": full_text, "tm": str(datetime.now(NIGERIA_TZ))})
             db.commit()
-            # PRG pattern - redirect so back button does NOT show typed text again
             return redirect(f"/dm/{other}")
         dms = db.execute(sa.text("SELECT * FROM dms WHERE (from_nickname=:u AND to_nickname=:o) OR (from_nickname=:o AND to_nickname=:u) ORDER BY id ASC"), {"u": nickname, "o": other}).mappings().all()
 
@@ -874,7 +867,6 @@ def dm_page(nickname, user, other):
 
     timer_js = Markup(f"""
     setTimeout(()=>{{ window.scrollTo(0, document.body.scrollHeight); }}, 300);
-        // FIX 6: Back button in DM goes to /chat, no history loop
     let exitBtn = document.querySelector('.exit-btn');
     if(exitBtn) exitBtn.setAttribute('onclick', "location.replace('/chat')");
     let lastCount = {len(dms)};
@@ -916,7 +908,6 @@ def dm_page(nickname, user, other):
     document.addEventListener('click', function(e){{ if(!e.target.closest('#msgMenu') &&!e.target.closest('.bubble')){{ let m=document.getElementById('msgMenu'); if(m) m.style.display='none'; }} }});
     """)
 
-    # FIX 3: Hide verified for other user, only show for MOTIZ SUPPORT
     verified_badge = ""
     if other == 'motiz_support':
         verified_badge = " <span class=badge style='background:gold;color:#0f3460;white-space:nowrap'>✓ VERIFIED SUPPORT</span>"
@@ -988,8 +979,8 @@ def group_page(nickname, user, gid):
     let exitBtn = document.querySelector('.exit-btn');
     if(exitBtn) exitBtn.setAttribute('onclick', "location.replace('/chat')");
     """)
-    """)
     return render_template_string(BASE, title=g['name'], header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script=timer_js)
+
 @app.route('/admin', methods=["GET","POST"])
 @login_required
 def admin(nickname, user):
@@ -1161,7 +1152,7 @@ def admin(nickname, user):
         manage_html = f"<div class=card><h2>📚 Manage Lessons</h2>{l_list or '<p>No lessons</p>'}</div>"
     elif manage == "notices":
         manage_html = f"<div class=card><h2>📢 Manage Notices</h2>{manage_notice_html or '<p>No notices</p>'}</div>"
-        elif manage == "complaints":
+    elif manage == "complaints":
         manage_html = f"<div class=card><h2>📩 Complaints Inbox ({complaints_count} Pending)</h2>{complaints_html}</div>"
 
     html = f'''
@@ -1173,7 +1164,7 @@ def admin(nickname, user):
     <div class="card"><h2>DANGER ZONE</h2><form method=POST onsubmit="return confirm('Delete ALL?')"><button name=clear_all_data class='btn red'>Clear All</button></form></div>
     <div class="card"><h2>GROUP 5: SETTINGS</h2><form method="POST"><input type="password" name="old_pass" placeholder="Current" required><input type="password" name="new_pass" placeholder="New" required><button name="change_pass" class='btn orange'>Change Pass</button></form></div>
     '''
-    return render_template_string(BASE.replace("__HEADER__", get_header(nickname, user)).replace("__CONTENT__", html), nickname=nickname, user=user)
+    return render_template_string(BASE, title="Admin", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"{error}{html}"), timer_script="")
 
 @app.route("/admin_attendance")
 @login_required
