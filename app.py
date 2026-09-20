@@ -1175,7 +1175,7 @@ def admin(nickname, user):
     return render_template_string(BASE.replace("__HEADER__", get_header(nickname, user)).replace("__CONTENT__", html), nickname=nickname, user=user)
 
 @app.route("/admin_attendance")
-def admin_attendance(nickname, user):
+def admin_attendance():
     if not session.get("admin_logged_in"): return redirect("/admin")
     with DBSession() as db:
         users = db.execute(sa.text("SELECT name, nickname, class, dept, q_used, lesson_expiry, is_verified, last_seen, referral_count, free_days FROM users WHERE nickname!='motiz_support' ORDER BY last_seen DESC NULLS LAST")).mappings().all()
