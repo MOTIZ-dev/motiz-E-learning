@@ -1165,12 +1165,13 @@ def admin(nickname, user):
         manage_html = f"<div class=card><h2>📩 Complaints Inbox ({complaints_count} Pending)</h2>{complaints_html}</div>"
     form = f"""<div class="card"><h2>Admin Panel V33 FINAL FIXED - NO CRASH</h2>{error}{bulk_result}</div>
 {edit_notice_form}{add_q_form}{bulk_form}{add_l_form}{manage_html}
-<div class="card"><h2>📝 GROUP 1: CBT QUESTIONS</h2><div style="display:flex;flex-direction:column;gap:8px">{group1}</div></div>
-<div class="card"><h2>🎓 GROUP 2: LESSONS</h2><div style="display:flex;flex-direction:column;gap:8px">{group2}</div></div>
-<div class="card"><h2>⚙️ GROUP 3: MANAGE</h2><a href=/admin?manage=questions class='btn blue'>📝 Manage Questions</a><a href=/admin?manage=lessons class='btn blue'>📚 Manage Lessons</a><a href=/admin?manage=notices class='btn orange'>📢 Manage Notices</a><a href=/admin?manage=complaints class='btn red'>📩 Complaints ({complaints_count})</a></div>
-<div class="card"><h2>👥 GROUP 4: PAYMENTS + POST NOTICE</h2>{pending_html or "<p>No pending</p>"}<a href=/admin_attendance class='btn blue'>👥 Attendance + Referrals</a><form method=POST style="margin-top:15px"><h3>Post Notice</h3><input name=notice_title placeholder="Title" required><textarea name=notice_text placeholder="Message" required></textarea><input name=media_link placeholder="Imgur link"><button name=post_notice class='btn'>📢 Post Notice</button></form></div>
-<div class="card"><h2>🛑 DANGER ZONE</h2><form method=POST onsubmit="return confirm('Delete ALL?')"><button name=clear_all_data class='btn red'>⚠️ Clear All</button></form></div>
-<div class="card"><h2>🔒 GROUP 5: SETTINGS</h2><form method="POST"><input type="password" name="old_pass" placeholder="Current" required><input type="password" name="new_pass" placeholder="New" required><button name="change_pass" class='btn orange'>🔒 Change Pass</button></form></div>"""
+{edit_notice_form}{add_q_form}{bulk_form}{add_l_form}{manage_html}
+<div class="card"><h2>GROUP 1: CBT QUESTIONS</h2><div style="display:flex;flex-direction:column;gap:8px">{group1}</div></div>
+<div class="card"><h2>GROUP 2: LESSONS</h2><div style="display:flex;flex-direction:column;gap:8px">{group2}</div></div>
+<div class="card"><h2>GROUP 3: MANAGE</h2><a href=/admin?manage=questions class='btn blue'>Manage Questions</a><a href=/admin?manage=lessons class='btn blue'>Manage Lessons</a><a href=/admin?manage=notices class='btn orange'>Manage Notices</a><a href=/admin?manage=complaints class='btn red'>Complaints ({complaints_count})</a></div>
+<div class="card"><h2>GROUP 4: PAYMENTS + POST NOTICE</h2>{pending_html or "<p>No pending</p>"}<a href=/admin_attendance class='btn blue'>Attendance + Referrals</a><form method=POST style="margin-top:15px"><h3>Post Notice</h3><input name=notice_title placeholder="Title" required><textarea name=notice_text placeholder="Message" required></textarea><input name=media_link placeholder="Imgur link"><button name=post_notice class='btn'>Post Notice</button></form></div>
+<div class="card"><h2>DANGER ZONE</h2><form method=POST onsubmit="return confirm('Delete ALL?')"><button name=clear_all_data class='btn red'>Clear All</button></form></div>
+<div class="card"><h2>GROUP 5: SETTINGS</h2><form method="POST"><input type="password" name="old_pass" placeholder="Current" required><input type="password" name="new_pass" placeholder="New" required><button name="change_pass" class='btn orange'>Change Pass</button></form></div>"""
     return render_template_string(BASE, title="Admin V33", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(form), timer_script="")
 
 @app.route('/admin_attendance')
