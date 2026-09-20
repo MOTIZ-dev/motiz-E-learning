@@ -1090,7 +1090,6 @@ def admin(nickname, user):
                     set_setting("notices", json.dumps(NOTICES)); error = "<div class=success>Notice Updated</div>"
                 if "delete_notice" in request.form:
                     nid = int(request.form["notice_id"])
-                    global NOTICES
                     NOTICES = [n for n in NOTICES if n.get('id')!=nid]
                     set_setting("notices", json.dumps(NOTICES)); error = "<div class=error>Notice Deleted</div>"
                 if "pin_notice" in request.form:
