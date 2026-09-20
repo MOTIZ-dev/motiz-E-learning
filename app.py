@@ -315,7 +315,7 @@ function saveSub(sub){{ fetch('/save-subscription', {{method:'POST', headers:{{'
 
 def get_header(nickname,user, show_nav=True, show_favicon=False):
     if not user: return ""
-        exit_html = f'<button onclick="location.href=\'/main\'" class="exit-btn">⬅️</button>'
+    exit_html = f'<button onclick="location.href=\'/main\'" class="exit-btn">⬅️</button>'
     favicon_html = f'<img src="{FAVICON_URL}" class="logo">' if show_favicon else ""
     theme_html = f'<button class="theme-btn" id="themeToggle" onclick="toggleTheme()">🌙</button>'
     unread = get_unread_count(nickname) if nickname!='motiz_support' else 0
