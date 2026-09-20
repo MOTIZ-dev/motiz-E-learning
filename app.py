@@ -212,25 +212,25 @@ BASE = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport
 <link rel="icon" type="image/png" href="{FAVICON_URL}">
 <link rel="manifest" href="/manifest.json">
 <title>{{{{title}}}}</title><style>
-:root{{--bg:#f0f2f5;--card:white;--text:#333;--primary:#0f3460}} body{{font-family:Segoe UI;background:var(--bg);color:var(--text);margin:0;padding:0;padding-bottom:70px}}
+:root{{--bg:#f0f2f5;--card:white;--text:#333;--primary:#0f3460}} body{{font-family:Segoe UI;background:var(--bg);color:var(--text);margin:0;padding:0;padding-bottom:90px}}
 body.dark{{--bg:#121212;--card:#1e1e1e;--text:#eee}} body.light{{--bg:#f0f2f5;--card:white;--text:#333}}
 .header{{background:var(--primary);color:white;padding:6px 10px;text-align:center;position:fixed;top:0;width:100%;z-index:1000;display:flex;justify-content:space-between;align-items:center;height:50px;box-sizing:border-box}}
-.header h1{{margin:0;font-size:0.80rem;flex:1;text-align:center;color:white!important}}
-.header img.logo{{width:45px;height:45px;border-radius:50%}}
+.header h1{{margin:0;font-size:0.80rem;flex:1;text-align:center;color:white!important;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;overflow:hidden}}
+.header img.logo{{width:40px;height:40px;border-radius:50%}}
 .theme-btn{{border:none;background:transparent;color:white;font-size:1.2rem;cursor:pointer}}
 .exit-btn{{background:transparent;color:white;border:none;padding:5px 10px;font-size:1.3rem;cursor:pointer}}
-.nav{{display:flex;gap:5px;background:#16213e;padding:5px;flex-wrap:wrap;position:fixed;top:50px;width:100%;z-index:999}}
-.nav a{{color:white!important;text-decoration:none;padding:5px 8px;border-radius:10px;border:1px solid #fff3;font-size:0.8rem}}
+.nav{{display:flex;gap:5px;background:#16213e;padding:6px 5px;flex-wrap:wrap;position:fixed;top:50px;width:100%;z-index:999}}
+.nav a{{color:white!important;text-decoration:none;padding:5px 8px;border-radius:10px;border:1px solid #fff3;font-size:0.8rem;white-space:nowrap}}
 .nav a:visited{{color:white!important}}
-.container{{padding:10px;padding-top:105px;padding-bottom:30px}}
+.container{{padding:10px;padding-top:125px;padding-bottom:90px}}
 .card{{background:var(--card);padding:12px;margin:8px 0;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}}
-.card:last-child{{margin-bottom:80px!important}}
+.card:last-child{{margin-bottom:90px!important}}
 .btn{{background:#28a745;color:white!important;padding:10px;display:block;margin:8px auto;text-align:center;font-weight:bold;border:none;width:95%;max-width:350px;border-radius:8px;cursor:pointer}}
-.btn.red{{background:#e94560!important}}.btn.blue{{background:#0f3460!important;border:1px solid white}}.btn.orange{{background:#ff9800!important}}.btn.gray{{background:#0f3460!important;width:90%;max-width:300px;font-size:0.85rem}}
+.btn.red{{background:#e94560!important}}.btn.blue{{background:#0f3460!important;border:1px solid white}}.btn.orange{{background:#ff9800!important}}.btn.gray{{background:#555!important;width:90%;max-width:300px;font-size:0.85rem}}
 input,select,textarea{{width:100%;padding:10px;margin:5px 0;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;background:var(--card);color:var(--text)}}
-.badge{{background:#1DA1F2;color:white;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:5px}}
-.badge.gold{{background:gold;color:#0f3460;font-weight:bold}}.badge.verified-paid{{background:#28a745;color:white}}
-.timer{{background:#e94560;color:white;padding:12px;text-align:center;border-radius:8px;font-weight:bold;position:sticky;top:105px;z-index:998}}
+.badge{{background:#1DA1F2;color:white;padding:3px 8px;border-radius:10px;font-size:0.7rem;white-space:nowrap;display:inline-flex;align-items:center;line-height:1;max-width:100%}}
+.badge.gold{{background:gold;color:#0f3460;font-weight:bold;white-space:nowrap}}.badge.verified-paid{{background:#28a745;color:white;white-space:nowrap}}
+.timer{{background:#e94560;color:white;padding:12px;text-align:center;border-radius:8px;font-weight:bold;position:sticky;top:125px;z-index:998}}
 .option{{background:#f0f2f5;padding:14px;margin:10px 0;border-radius:8px;color:black;display:flex;gap:10px}}
 .chat-msg{{display:flex;margin:8px 0;gap:8px}}.chat-msg.me{{justify-content:flex-end}}.chat-msg.other{{justify-content:flex-start}}
 .bubble{{padding:10px 14px;border-radius:18px;max-width:70%}}.me.bubble{{background:#2196f3!important;color:white!important}}.other.bubble{{background:#e0e0e0;color:#333}}
@@ -247,13 +247,17 @@ input,select,textarea{{width:100%;padding:10px;margin:5px 0;border-radius:5px;bo
 .cbt-btn-fix{{display:block;width:95%;max-width:340px;white-space:normal;line-height:1.3;padding:10px;font-size:0.85rem;margin:8px auto}}
 .calc-float{{position:fixed;bottom:80px;right:10px;background:#222;color:white;padding:10px;border-radius:10px;z-index:9998;width:220px;display:none;border:2px solid #ff9800}}
 .community-bg-post{{padding:30px 15px;text-align:center;border-radius:15px;color:white;font-size:1.4rem;font-weight:bold;min-height:120px;display:flex;align-items:center;justify-content:center}}
+.bg-option{{width:35px;height:35px;border-radius:50%;display:inline-block;margin:4px;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.3)}}
+.bg-option.selected{{border:3px solid #0f3460;transform:scale(1.2)}}
+.like-row{{display:flex;gap:8px;justify-content:flex-start;align-items:center;margin-top:8px}}
+.like-row.btn{{width:auto;flex:1;max-width:48%;padding:6px 10px;font-size:0.85rem;margin:0}}
 </style></head><body>
 <div id="updateBanner">🔄 New version - <button onclick="location.reload(true)" style="background:white;color:#ff9800;border:none;padding:5px 10px;border-radius:5px">Update now</button></div>
 {{{{header}}}}<div class="container">{{{{content}}}}</div>
 <div id="fixedAdBar"><button onclick="document.getElementById('fixedAdBar').style.display='none'" style="position:absolute;top:2px;right:5px;background:#000;color:#fff;border:none;border-radius:50%;width:20px;height:20px">X</button><div id="adContainer" style="width:728px;max-width:100%;height:60px;display:flex;align-items:center;justify-content:center;"><script>atOptions = {{'key' : '{FIXED_AD_KEY}','format' : 'iframe','height' : 60,'width' : 728,'params' : {{}} }};</script><script src="https://www.highrevenueformat.com/{FIXED_AD_KEY}/invoke.js"></script></div></div>
 <script>
 {{{{timer_script}}}}
-if(window.location.pathname.startsWith('/exam') || window.location.pathname.startsWith('/cbt/')){{ var ad=document.getElementById('fixedAdBar'); if(ad) ad.style.display='none'; }}
+if(window.location.pathname.startsWith('/exam') || window.location.pathname.startsWith('/cbt/') || window.location.pathname.startsWith('/dm/')){{ var ad=document.getElementById('fixedAdBar'); if(ad) ad.style.display='none'; }}
 let adRefreshInterval = {AD_REFRESH_SECONDS} * 1000;
 setInterval(function(){{
  let adBar=document.getElementById('fixedAdBar');
@@ -269,13 +273,14 @@ setInterval(function(){{
  if(btn) btn.innerText = saved==='light'? '☀️ Light' : '🌙 Dark';
 }})();
 function toggleTheme(){{
+ playClickSound();
  let isLight = document.body.classList.contains('light');
  document.body.classList.remove('light','dark');
  if(isLight){{ document.body.classList.add('dark'); localStorage.setItem('motiz_theme','dark'); document.getElementById('themeToggle').innerText='🌙 Dark'; }}
  else {{ document.body.classList.add('light'); localStorage.setItem('motiz_theme','light'); document.getElementById('themeToggle').innerText='☀️ Light'; }}
 }}
 function playClickSound(){{ try{{ let ctx=new (window.AudioContext||window.webkitAudioContext)(); let o=ctx.createOscillator(); o.frequency.value=600; o.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.08); }}catch(e){{}} }}
-document.addEventListener('click', function(e){{ if(e.target.closest('.btn')) playClickSound(); }});
+document.addEventListener('click', function(e){{ if(e.target.closest('.btn, a, button,.friend-card,.bg-option')) playClickSound(); }});
 let lastGlobalUnread = 0;
 setInterval(()=>{{
  if(window.location.pathname.startsWith('/dm/') || window.location.pathname.startsWith('/group/')) return;
@@ -289,23 +294,36 @@ setInterval(()=>{{
 if('serviceWorker' in navigator){{
  navigator.serviceWorker.register('/sw.js').then(reg=>{{
   reg.onupdatefound=()=>{{ document.getElementById('updateBanner').style.display='block'; }};
-  if(Notification.permission!=='granted'){{ Notification.requestPermission(); }}
+  if('Notification' in window){{
+   if(Notification.permission==='default'){{ Notification.requestPermission().then(p=>{{ if(p==='granted') subscribePush(reg); }}); }}
+   else if(Notification.permission==='granted'){{ subscribePush(reg); }}
+  }}
  }});
 }}
+function subscribePush(reg){{
+ if(!reg.pushManager) return;
+ reg.pushManager.getSubscription().then(sub=>{{
+  if(sub){{ saveSub(sub); }}
+  else {{
+   reg.pushManager.subscribe({{userVisibleOnly:true, applicationServerKey:'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U'}}).then(s=>saveSub(s)).catch(()=>{{}});
+  }}
+ }});
+}}
+function saveSub(sub){{ fetch('/save-subscription', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify(sub)}}); }}
 </script>
 </body></html>"""
 
 def get_header(nickname,user, show_nav=True, show_favicon=False):
     if not user: return ""
-    exit_html = f'<button onclick="history.back()" class="exit-btn">⬅️</button>' if not show_favicon else ""
+    exit_html = f'<button onclick="if(history.length>1){{history.back()}} else {{location.href=\'/main\'}}" class="exit-btn">⬅️</button>'
     favicon_html = f'<img src="{FAVICON_URL}" class="logo">' if show_favicon else ""
     theme_html = f'<button class="theme-btn" id="themeToggle" onclick="toggleTheme()">🌙</button>'
     unread = get_unread_count(nickname) if nickname!='motiz_support' else 0
     bell = f" 🔔({unread})" if unread>0 else ""
     is_support = nickname=='motiz_support'
-    verified = '<span class=badge gold>✓ MOTIZ SUPPORT VERIFIED</span>' if is_support else ('<span class=badge verified-paid>✓ Verified Paid</span>' if user.get('is_verified') else "")
+    verified = '<span class=badge gold>✓ MOTIZ SUPPORT</span>' if is_support else ('<span class=badge verified-paid>✓ Verified Paid</span>' if user.get('is_verified') else "")
     nav_html = f"""<div class="nav"><a href="/main">🏠 Home</a><a href="/exam">✍️ CBT</a><a href="/lessons">🎓 Lessons</a><a href="/community">🌍 Community</a><a href="/chat">💬 Chat{bell}</a><a href="/me">👤 Me</a><a href="/complain">📩 Complain</a></div>""" if show_nav else ""
-    return f"""<div class="header">{favicon_html}{exit_html}<h1 style="color:white!important">MOTIZ E-LEARNING {verified}</h1>{theme_html}</div>{nav_html}"""
+    return f"""<div class="header">{favicon_html}{exit_html}<h1 style="color:white!important">MOTIZ {verified}</h1>{theme_html}</div>{nav_html}"""
 
 @app.route('/manifest.json')
 def manifest():
@@ -318,11 +336,23 @@ self.addEventListener('install', e=>self.skipWaiting());
 self.addEventListener('activate', e=>self.clients.claim());
 self.addEventListener('fetch', e=>{ e.respondWith(fetch(e.request).catch(()=>caches.match(e.request))) });
 self.addEventListener('push', function(event){
-  const data = event.data? event.data.json() : {title:'MOTIZ', body:'New message from friend'};
+  const data = event.data? event.data.json() : {title:'MOTIZ E-LEARNING', body:'New message from friend'};
   event.waitUntil(self.registration.showNotification(data.title, {body:data.body, icon:'https://i.imgur.com/5TCBgkN.png', badge:'https://i.imgur.com/5TCBgkN.png', vibrate:[200,100,200]}));
 });
 self.addEventListener('notificationclick', function(event){ event.notification.close(); event.waitUntil(clients.openWindow('/chat')); });
 """, mimetype='application/javascript')
+
+@app.route('/save-subscription', methods=["POST"])
+@login_required
+def save_sub(nickname, user):
+    try:
+        sub = request.get_json()
+        with DBSession() as db:
+            db.execute(sa.text("UPDATE users SET push_sub=:s WHERE nickname=:u"), {"s": json.dumps(sub), "u": nickname})
+            db.commit()
+        return {"ok": True}
+    except:
+        return {"ok": False}
 
 @app.route('/check_unread')
 @login_required
@@ -353,8 +383,8 @@ def register():
                     if ref: db.execute(sa.text("INSERT INTO referrals (referrer, referred) VALUES (:r, :ref)"), {"r": ref, "ref": nickname})
                     db.commit()
                     session["nickname"] = nickname; return redirect("/main")
-    js = """<script>function d(){let c=document.getElementById('class').value;let x=document.getElementById('dept');x.innerHTML='';if(['SS1','SS2','SS3'].includes(c)){x.innerHTML='<label>Department *</label><select name=dept id=dept required><option value="">Select Department</option><option>Science</option><option>Commercial</option><option>Art</option></select>'}else{x.innerHTML='<input type=hidden name=dept value=>';}}</script>"""
-    form = f"<div class='card'><h2>Register</h2>{error}<form method=POST><input name=nickname placeholder='Nickname' required><input name=surname placeholder='Surname' required><input name=other placeholder='Other Name' required><input type=password name=password placeholder='Password' required><select name=class id=class onchange=d() required><option value=''>Select Class</option>{''.join([f'<option>{c}</option>' for c in CLASSES])}</select><div id=dept></div><button class=btn>Register</button><p>Already have account? <a href=/login>Login</a></p></form></div>{js}"
+    js = """<script>function d(){let c=document.getElementById('class').value;let x=document.getElementById('deptBox');x.innerHTML='';if(['SS1','SS2','SS3'].includes(c)){x.innerHTML='<label>Department *</label><select name=dept required><option value="">Select Department</option><option>Science</option><option>Commercial</option><option>Art</option></select>'}else{x.innerHTML='<input type=hidden name=dept value=>';}}</script>"""
+    form = f"<div class='card'><h2>Register</h2>{error}<form method=POST><input name=nickname placeholder='Nickname' required><input name=surname placeholder='Surname' required><input name=other placeholder='Other Name' required><input type=password name=password placeholder='Password' required><select name=class id=class onchange=d() required><option value=''>Select Class</option>{''.join([f'<option>{c}</option>' for c in CLASSES])}</select><div id=deptBox></div><button class=btn>Register</button><p>Already have account? <a href=/login>Login</a></p></form></div>{js}"
     return render_template_string(BASE, title="Register", header="", content=Markup(form), timer_script="")
 
 @app.route('/login', methods=["GET","POST"])
@@ -397,13 +427,14 @@ def main(nickname, user):
 def logout():
     session.clear()
     return redirect("/login")
+
 @app.route('/exam')
 @login_required
 def exam(nickname, user):
     key = f"{user['class']}_{user['dept']}" if user['dept'] else user['class']
     subs = SUBJECTS.get(key, [])
     if not subs:
-        return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=error>No subjects for your class yet</div><button class=btn blue onclick='history.back()'>⬅️ Back</button>"), timer_script="")
+        return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=error>No subjects for your class yet</div>"), timer_script="")
     if user.get('payment_verified_date'):
         try:
             verified_date = datetime.strptime(user['payment_verified_date'], "%Y-%m-%d").date()
@@ -431,7 +462,7 @@ def exam(nickname, user):
                 else:
                     btn = f"<a class='btn blue cbt-btn-fix' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}'><span>{emoji} {s}</span><br><small>{done}/{min(limit,total_q)} done</small></a>"
             sub_btns += btn
-    content = f"<div class='card'><h2>Subjects for {user['class']} {user.get('dept','')}</h2>{sub_btns}</div><button class=btn blue onclick='history.back()' style='margin-top:20px'>⬅️ Back</button>"
+    content = f"<div class='card'><h2>Subjects for {user['class']} {user.get('dept','')}</h2>{sub_btns}</div>"
     return render_template_string(BASE, title="CBT", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
 @app.route('/cbt/<path:key>/<path:sub>', methods=["GET","POST"])
@@ -447,7 +478,7 @@ def cbt_exam(nickname, user, key, sub):
             return redirect(f"/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}")
         all_count = db.execute(sa.text("SELECT COUNT(*) FROM questions WHERE key=:k"), {"k": full_key}).scalar() or 0
         if all_count == 0:
-            return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>😕 No Questions Yet for {subj_emoji(sub)} {sub}</h2><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"), timer_script="")
+            return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>😕 No Questions Yet for {subj_emoji(sub)} {sub}</h2></div>"), timer_script="")
         prog = db.execute(sa.text("SELECT used FROM cbt_progress WHERE nickname=:u AND subject_key=:k"), {"u": nickname, "k": full_key}).scalar()
         if prog is None:
             db.execute(sa.text("INSERT INTO cbt_progress (nickname, subject_key, used) VALUES (:u, :k, 0) ON CONFLICT (nickname, subject_key) DO NOTHING"), {"u": nickname, "k": full_key})
@@ -458,7 +489,7 @@ def cbt_exam(nickname, user, key, sub):
         if not user.get('is_verified') and prog >= FREE_Q:
             with DBSession() as db: pending = db.execute(sa.text("SELECT * FROM payments WHERE nickname=:u AND type='questions' AND status='Pending'"), {"u": nickname}).scalar()
             if pending:
-                content = "<div class=card><h2>⏳ Payment Under Review</h2><p>Admin verifying.</p></div><button class=btn blue onclick='history.back()'>⬅️ Back</button>"
+                content = "<div class=card><h2>⏳ Payment Under Review</h2><p>Admin verifying.</p></div>"
             else:
                 content = f'<div class=card><h2>🔒 Unlock 70 More for {subj_emoji(sub)} {sub}</h2><p><b>Pay &#8358;{QUESTION_PRICE} for 30 days</b></p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account:</b><input class=readonly-box readonly value="{PALMPAY_ACCOUNT}"><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/questions><input name=bank_used placeholder="Bank you used" required><input name=account_name placeholder="Account Name" required><button class=btn>Submit</button></form><a class=btn blue href="/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1">🔄 Redo Free 10</a></div>'
             return render_template_string(BASE, title="Paywall", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
@@ -469,7 +500,7 @@ def cbt_exam(nickname, user, key, sub):
     questions = [dict(q) for q in batch_q]
     for q in questions: q['options'] = json.loads(q['options'])
     if not questions:
-        return render_template_string(BASE, title="Done", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>✅ Completed {sub}</h2><a class=btn href=/exam>Back</a><a class=btn blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo</a></div>"), timer_script="")
+        return render_template_string(BASE, title="Done", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>✅ Completed {sub}</h2><a class=btn href=/exam>Back to Subjects</a><a class=btn blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo</a></div>"), timer_script="")
     time_per_q = 60 if sub in CALC_SUBJECTS else 30
     batch_time = len(questions) * time_per_q
     if request.method == "POST":
@@ -490,7 +521,7 @@ def cbt_exam(nickname, user, key, sub):
             sound_js = "let ctx=new (window.AudioContext||window.webkitAudioContext)(); let notes=[523,659,784,1046]; notes.forEach((f,i)=>{let o=ctx.createOscillator(); o.frequency.value=f; o.connect(ctx.destination); o.start(ctx.currentTime+i*0.15); o.stop(ctx.currentTime+i*0.15+0.3);});"
         else:
             sound_js = "let ctx=new (window.AudioContext||window.webkitAudioContext)(); let o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=150; o.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.6);"
-        content = f"<div class='card'><h2>🎉 RESULT {subj_emoji(sub)} {sub}</h2><p><b>Score: {score}/{total}</b></p><p>Completed: {new_done}/{min(total_limit,all_count)}</p></div>{result_html}{next_btn}<a class=btn blue href=/exam>Back</a><script>setTimeout(()=>{{try{{{sound_js}}}catch(e){{}}}},500)</script>"
+        content = f"<div class='card'><h2>🎉 RESULT {subj_emoji(sub)} {sub}</h2><p><b>Score: {score}/{total}</b></p><p>Completed: {new_done}/{min(total_limit,all_count)}</p></div>{result_html}{next_btn}<a class=btn blue href=/exam>Back to Subjects</a><script>setTimeout(()=>{{try{{{sound_js}}}catch(e){{}}}},500)</script>"
         return render_template_string(BASE, title="Result", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
     q_html = ""
     for i,q in enumerate(questions):
@@ -508,24 +539,6 @@ def cbt_exam(nickname, user, key, sub):
         timeLeft--;
     }}
     updateTimer(); setInterval(updateTimer, 1000);
-    let calcHtml = `<div id=calcBox class=calc-float>
-    <div style='display:flex;justify-content:space-between'><b>🧮 Calculator</b><button onclick="document.getElementById('calcBox').style.display='none'" style='background:red;color:white;border:none;border-radius:50%;width:22px'>X</button></div>
-    <input id=calcDisplay readonly style='width:100%;margin:8px 0;padding:8px;font-size:1.1rem;text-align:right;background:#000;color:#0f0;border:none;border-radius:5px'>
-    <div style='display:grid;grid-template-columns:repeat(4,1fr);gap:5px'>
-    <button onclick="calcIn('7')" class=btn gray>7</button><button onclick="calcIn('8')" class=btn gray>8</button><button onclick="calcIn('9')" class=btn gray>9</button><button onclick="calcIn('/')" class=btn orange>/</button>
-    <button onclick="calcIn('4')" class=btn gray>4</button><button onclick="calcIn('5')" class=btn gray>5</button><button onclick="calcIn('6')" class=btn gray>6</button><button onclick="calcIn('*')" class=btn orange>*</button>
-    <button onclick="calcIn('1')" class=btn gray>1</button><button onclick="calcIn('2')" class=btn gray>2</button><button onclick="calcIn('3')" class=btn gray>3</button><button onclick="calcIn('-')" class=btn orange>-</button>
-    <button onclick="calcIn('0')" class=btn gray>0</button><button onclick="calcIn('.')" class=btn gray>.</button><button onclick="calcIn('(')" class=btn gray>(</button><button onclick="calcIn(')')" class=btn gray>)</button>
-    <button onclick="calcClear()" class=btn red>C</button><button onclick="calcSqrt()" class=btn blue>√</button><button onclick="calcPow()" class=btn blue>x²</button><button onclick="calcEval()" class=btn orange style='background:green'>=</button>
-    <button onclick="calcIn('+')" class=btn orange style='grid-column:span 4'>+</button>
-    </div></div>
-    <button onclick="document.getElementById('calcBox').style.display='block'" style='position:fixed;bottom:80px;right:10px;z-index:9997;background:#ff9800;color:white;border:none;border-radius:50%;width:50px;height:50px;font-size:20px'>🧮</button>`;
-    document.body.insertAdjacentHTML('beforeend', calcHtml);
-    function calcIn(v){{ document.getElementById('calcDisplay').value+=v; }}
-    function calcClear(){{ document.getElementById('calcDisplay').value=''; }}
-    function calcSqrt(){{ let d=document.getElementById('calcDisplay'); try{{ d.value=Math.sqrt(eval(d.value)); }}catch(e){{ d.value='Error'; }} }}
-    function calcPow(){{ let d=document.getElementById('calcDisplay'); try{{ d.value=Math.pow(eval(d.value),2); }}catch(e){{ d.value='Error'; }} }}
-    function calcEval(){{ let d=document.getElementById('calcDisplay'); try{{ d.value=eval(d.value); }}catch(e){{ d.value='Error'; }} }}
     """)
     content = f"<form method=POST id=cbt_form><h2 style='background:#0f3460;color:white;text-align:center;padding:10px;border-radius:8px'>{subj_emoji(sub)} {sub} - Batch {math.floor(prog/BATCH_SIZE)+1}</h2><p style='text-align:center'>{time_per_q}s per question (Total {batch_time//60}:{batch_time%60:02d})</p>{q_html}<button class='btn orange'>Submit</button></form>"
     return render_template_string(BASE, title=f"{sub}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
@@ -537,7 +550,7 @@ def confirm(nickname, user, t):
         db.execute(sa.text("INSERT INTO payments (nickname, name, type, status, bank_used, account_name, date_paid) VALUES (:u, :n, :t, 'Pending', :b, :a, :d)"),
         {"u": nickname, "n": user["name"], "t": t, "b": request.form["bank_used"], "a": request.form["account_name"], "d": str(date.today())});
         db.commit()
-    return render_template_string(BASE, title="Sent", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class='card'><h2>✅ Request Sent</h2><p>Admin will verify within 24hrs</p><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"), timer_script="")
+    return render_template_string(BASE, title="Sent", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class='card'><h2>✅ Request Sent</h2><p>Admin will verify within 24hrs</p></div>"), timer_script="")
 
 @app.route('/lessons')
 @login_required
@@ -554,7 +567,7 @@ def lessons(nickname, user):
         if user.get('lesson_expiry'):
             all_lessons = db.execute(sa.text("SELECT * FROM lessons WHERE class=:c AND (dept=:d OR dept='' OR dept IS NULL) ORDER BY date DESC"), {"c": user['class'], "d": user.get('dept','')}).mappings().all()
             if not all_lessons:
-                return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🎓 No lessons yet for {user['class']} {user.get('dept','')}</h2><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"), timer_script="")
+                return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🎓 No lessons yet for {user['class']} {user.get('dept','')}</h2></div>"), timer_script="")
             html = ""
             for l in all_lessons:
                 media = ""
@@ -566,10 +579,10 @@ def lessons(nickname, user):
                         media = f"<img src='{link}' class='lesson-media'>"
                 d12 = format_12h(l['date'])
                 html += f"<div class=card><h3>{subj_emoji(l['subject'])} {l['title']} - {l['subject']}</h3><p>{l['notes']}</p>{media}<small>{d12}</small></div>"
-            return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html + "<button class=btn blue onclick='history.back()'>⬅️ Back</button>"), timer_script="")
+            return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
         pending = db.execute(sa.text("SELECT * FROM payments WHERE nickname=:u AND type='lessons' AND status='Pending'"), {"u": nickname}).scalar()
         if pending:
-            return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>⏳ Payment Under Review</h2><p>Admin will verify your lesson payment.</p><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"), timer_script="")
+            return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>⏳ Payment Under Review</h2><p>Admin will verify your lesson payment.</p></div>"), timer_script="")
     return render_template_string(BASE, title="Pay Lesson", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🔒 Unlock Lessons - ₦{LESSON_PRICE}/30days</h2><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Acct:</b><input class=readonly-box readonly value={PALMPAY_ACCOUNT}><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/lessons><input name=bank_used placeholder='Bank you used' required><input name=account_name placeholder='Account Name' required><button class=btn>Submit</button></form></div>"), timer_script="")
 
 @app.route('/complain', methods=["GET","POST"])
@@ -580,7 +593,7 @@ def complain_page(nickname, user):
         if request.method=="POST" and request.form.get("text"):
             cnt = db.execute(sa.text("SELECT COUNT(*) FROM complaints WHERE nickname=:u AND created_at > NOW() - INTERVAL '7 days'"), {"u": nickname}).scalar() or 0
             if cnt >= 3:
-                return render_template_string(BASE, title="Complain Limit", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><div class=error>❌ You don reach limit - 3 complains per week only.</div><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"), timer_script="")
+                return render_template_string(BASE, title="Complain Limit", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><div class=error>❌ You don reach limit - 3 complains per week only.</div></div>"), timer_script="")
             db.execute(sa.text("INSERT INTO complaints (nickname, name, text) VALUES (:u,:n,:t)"), {"u": nickname, "n": user["name"], "t": request.form["text"][:700]})
             db.commit()
             return redirect("/complain")
@@ -610,15 +623,15 @@ def community(nickname, user):
             db.execute(sa.text("INSERT INTO posts (nickname, name, text, bg) VALUES (:u,:n,:t,:bg)"), {"u": nickname, "n": user["name"], "t": txt, "bg": bg})
             db.commit(); return redirect("/community")
         posts = db.execute(sa.text("SELECT * FROM posts ORDER BY created_at DESC LIMIT 50")).mappings().all()
-        verified_users = db.execute(sa.text("SELECT nickname FROM users WHERE is_verified=TRUE")).scalars().all()
-        verified_set = set(verified_users)
     bg_options = ["", "linear-gradient(135deg,#ff9a9e,#fecfef)", "linear-gradient(135deg,#a18cd1,#fbc2eb)", "linear-gradient(135deg,#ff6a00,#ee0979)", "linear-gradient(135deg,#667eea,#764ba2)", "linear-gradient(135deg,#f7971e,#ffd200)", "linear-gradient(135deg,#000000,#434343)", "linear-gradient(135deg,#11998e,#38ef7d)", "linear-gradient(135deg,#fc5c7d,#6a82fb)", "linear-gradient(135deg,#0f3460,#e94560)"]
     bg_html = ""
     for b in bg_options:
         if b == "":
             bg_html += f"<div class='bg-option' data-bg='' style='background:white;border:1px solid #ccc' onclick=\"selectBg(this,'')\"></div>"
         else:
-            bg_html += f"<div class='bg-option' data-bg=\"{b}\" style='background:{b}' onclick=\"selectBg(this,'{b}')\"></div>"
+            # use double quotes for data, single for onclick param to avoid break
+            safe_b = b.replace('"', '&quot;')
+            bg_html += f"<div class='bg-option' data-bg=\"{safe_b}\" style='background:{b}' onclick=\"selectBg(this, '{b}')\"></div>"
     html = f"""<div class=card>
     <form method=POST id=communityForm>
     <textarea name=text id=communityText placeholder='What is on your mind........' required maxlength=700 oninput="previewBg()"></textarea>
@@ -628,8 +641,19 @@ def community(nickname, user):
     <button class=btn>Post</button>
     </form>
     <script>
-    function selectBg(el, bg){{ document.querySelectorAll('.bg-option').forEach(x=>x.classList.remove('selected')); el.classList.add('selected'); document.getElementById('selectedBg').value = bg; previewBg(); }}
-    function previewBg(){{ let txt=document.getElementById('communityText').value; let bg=document.getElementById('selectedBg').value; let prev=document.getElementById('bgPreview'); if(bg && txt){{ prev.style.display='flex'; prev.style.background=bg; prev.innerText=txt; }} else {{ prev.style.display='none'; }} }}
+    function selectBg(el, bg){{
+        document.querySelectorAll('.bg-option').forEach(x=>x.classList.remove('selected'));
+        el.classList.add('selected');
+        document.getElementById('selectedBg').value = bg;
+        previewBg();
+    }}
+    function previewBg(){{
+        let txt=document.getElementById('communityText').value;
+        let bg=document.getElementById('selectedBg').value;
+        let prev=document.getElementById('bgPreview');
+        if(bg && txt){{ prev.style.display='flex'; prev.style.background=bg; prev.innerText=txt; }}
+        else {{ prev.style.display='none'; }}
+    }}
     </script>
     </div>"""
     for p in posts:
@@ -639,14 +663,19 @@ def community(nickname, user):
         except: comments=[]
         is_motiz = p['nickname']=='motiz_support'
         is_author = p['nickname']==nickname
-        is_paid = p['nickname'] in verified_set
-        style = "style='border:3px solid gold;background:linear-gradient(135deg,#fff8e1,#ffe082)'" if is_motiz else "style='border:2px solid #28a745'" if is_paid else ""
+        # FIX 3: HIDE PAID STATUS - only MOTIZ SUPPORT gets badge/gold border, others get normal card
+        if is_motiz:
+            style = "style='border:3px solid gold;background:linear-gradient(135deg,#fff8e1,#ffe082)'"
+            badge_html = " <span class=badge gold>✓ MOTIZ SUPPORT VERIFIED</span> <span style=background:gold;padding:2px 5px;border-radius:5px;font-size:0.6rem;color:#0f3460;font-weight:bold;white-space:nowrap>ADMIN</span>"
+        else:
+            style = ""
+            badge_html = ""
         bg_val = p.get('bg','') if isinstance(p, dict) else (p['bg'] if 'bg' in p else '')
         t12 = format_12h(str(p['created_at']))
-        badge_html = " <span class=badge gold>✓ MOTIZ SUPPORT VERIFIED</span> <span style=background:gold;padding:2px 5px;border-radius:5px;font-size:0.6rem;color:#0f3460;font-weight:bold>ADMIN</span>" if is_motiz else (" <span class=badge verified-paid>✓ Verified Paid</span>" if is_paid else "")
-        del_btn = f"<a class=btn red href='/community?del_post={p['id']}' onclick=\"return confirm('Delete this post?')\" style='padding:8px;font-size:0.8rem;margin:5px 0;width:90%;max-width:280px'>🗑️ Delete</a>" if (is_author or nickname=='motiz_support') else ""
+        del_btn = f"<a class=btn red href='/community?del_post={p['id']}' onclick=\"return confirm('Delete this post?')\" style='padding:6px;font-size:0.8rem;margin:5px 0;width:90%;max-width:280px'>🗑️ Delete</a>" if (is_author or nickname=='motiz_support') else ""
         text_html = f"<div class='community-bg-post' style='background:{bg_val}'>{p['text']}</div>" if bg_val else f"<p>{p['text']}</p>"
-        html+=f"<div class=card {style}><b>{p['name']}</b>{badge_html}<br><small>{t12}</small>{text_html}{del_btn}<div style='display:flex;gap:5px;flex-wrap:wrap;justify-content:center'><a class=btn gray href='/like/{p['id']}' style='width:44%;max-width:140px'>👍 Like ({len(likes)})</a><a class=btn gray href='/post/{p['id']}' style='width:44%;max-width:140px'>💬 Comment ({len(comments)})</a></div></div>"
+        # FIX 4: SMALL LIKE/COMMENT ON ONE LINE
+        html+=f"<div class=card {style}><b>{p['name']}</b>{badge_html}<br><small>{t12}</small>{text_html}{del_btn}<div class=like-row><a class='btn gray' href='/like/{p['id']}' style='flex:1;padding:6px 8px;font-size:0.8rem;margin:0'>👍 Like ({len(likes)})</a><a class='btn gray' href='/post/{p['id']}' style='flex:1;padding:6px 8px;font-size:0.8rem;margin:0'>💬 Comment ({len(comments)})</a></div></div>"
     return render_template_string(BASE, title="Community", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
 
 @app.route('/like/<int:pid>')
@@ -683,7 +712,7 @@ def post_detail(nickname, user, pid):
         for c in comments:
             ct12 = format_12h(c.get('time',''))
             html+=f"<div class=card><b>{c['name']}</b><p>{c['text']}</p><small>{ct12}</small></div>"
-        html+=f"<div class=card><form method=POST><textarea name=comment placeholder='Add comment' required></textarea><button class=btn>Comment</button></form></div><button class=btn blue onclick='history.back()'>⬅️ Back</button>"
+        html+=f"<div class=card><form method=POST><textarea name=comment placeholder='Add comment' required></textarea><button class=btn>Comment</button></form></div>"
     return render_template_string(BASE, title="Post", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
 
 @app.route('/chat')
@@ -693,19 +722,17 @@ def chat(nickname, user):
         db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname}); db.commit()
         friends = user.get('friends', [])
         friend_cards = ""
-        verified_list = db.execute(sa.text("SELECT nickname FROM users WHERE is_verified=TRUE")).scalars().all()
-        verified_set = set(verified_list)
         for f in friends:
             if f == 'motiz_support':
-                friend_cards+=f"<a href=/dm/{f} class=friend-card style='border:3px solid gold;background:linear-gradient(135deg,#fff8e1,#ffe082)'><div class=friend-avatar style='background:gold;color:#0f3460'>✓</div><div><b>MOTIZ SUPPORT</b> <span class=badge style='background:gold;color:#0f3460'>✓ VERIFIED SUPPORT</span><br><small>Official Support</small></div></a>"
+                friend_cards+=f"<a href=/dm/{f} class=friend-card style='border:3px solid gold;background:linear-gradient(135deg,#fff8e1,#ffe082)'><div class=friend-avatar style='background:gold;color:#0f3460'>✓</div><div><b>MOTIZ SUPPORT</b> <span class=badge style='background:gold;color:#0f3460;white-space:nowrap'>✓ VERIFIED SUPPORT</span><br><small>Official Support</small></div></a>"
                 continue
             u = db.execute(sa.text("SELECT name,last_seen FROM users WHERE nickname=:u"), {"u": f}).mappings().first()
             if u:
                 last = format_last_seen(u['last_seen']) if u.get('last_seen') else "Unknown"
-                badge = " <span class=badge style='background:#28a745'>✓ Verified Paid</span>" if f in verified_set else ""
                 unread = get_unread_per_friend(nickname, f)
                 bell = f" <span style='background:red;color:white;padding:2px 6px;border-radius:10px;font-size:0.7rem'>🔔{unread}</span>" if unread>0 else ""
-                friend_cards+=f"<a href=/dm/{f} class=friend-card><div class=friend-avatar>{f[0].upper()}</div><div><b>{u['name']}</b>{badge}{bell}<br><small>{last}</small></div></a>"
+                # FIX 3: NO VERIFIED BADGE FOR FRIENDS - HIDDEN FOR PRIVACY
+                friend_cards+=f"<a href=/dm/{f} class=friend-card><div class=friend-avatar>{f[0].upper()}</div><div><b>{u['name']}</b>{bell}<br><small>{last}</small></div></a>"
         groups = db.execute(sa.text("SELECT * FROM groups")).mappings().all()
         group_html = ""
         for g in groups:
@@ -713,7 +740,7 @@ def chat(nickname, user):
             except: members=[]
             if nickname in members:
                 group_html+=f"<a href=/group/{g['id']} class=friend-card><div class=friend-avatar>👥</div><div><b>{g['name']}</b><br><small>{len(members)} members</small></div></a>"
-    content = f"<h3>Friends ({len([x for x in friends if x!='motiz_support'])})</h3>{friend_cards or '<div class=card><p>No friends yet</p><a class=btn blue href=/me>👤 Go to Me to Add Friends</a></div>'}<h3>Groups</h3>{group_html or '<p>No groups</p>'}<a class=btn blue href=/create_group>➕ Create Group</a><button class=btn blue onclick='history.back()' style='margin-top:15px'>⬅️ Back</button>"
+    content = f"<h3>Friends ({len([x for x in friends if x!='motiz_support'])})</h3>{friend_cards or '<div class=card><p>No friends yet</p><a class=btn blue href=/me>👤 Go to Me to Add Friends</a></div>'}<h3>Groups</h3>{group_html or '<p>No groups</p>'}<a class=btn blue href=/create_group>➕ Create Group</a>"
     return render_template_string(BASE, title="Chat", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
 @app.route('/me')
@@ -722,7 +749,6 @@ def me_page(nickname, user):
     offset = int(request.args.get('offset', 0))
     with DBSession() as db:
         db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname}); db.commit()
-        # FRIEND REQUESTS MOVED TO ME PAGE
         reqs = db.execute(sa.text("SELECT * FROM friend_requests WHERE to_nickname=:u AND status='Pending'"), {"u": nickname}).mappings().all()
         req_html = ""
         for r in reqs:
@@ -732,19 +758,18 @@ def me_page(nickname, user):
         pending_to = [r['to_nickname'] for r in db.execute(sa.text("SELECT to_nickname FROM friend_requests WHERE from_nickname=:u AND status='Pending'"), {"u": nickname}).mappings().all()]
         filtered = [u for u in all_users if u['nickname'] not in friends and u['nickname'] not in pending_to]
         batch = filtered[offset:offset+FRIENDS_BATCH]
-        is_verified_badge = " <span class=badge style='background:#28a745'>✓ Verified Paid</span>" if user.get('is_verified') else ""
+        is_verified_badge = " <span class=badge style='background:#28a745;white-space:nowrap'>✓ Verified Paid</span>" if user.get('is_verified') else ""
         html = f"{req_html}<div class=card style='border:2px solid #28a745'><h2>{user['name']}{is_verified_badge} - {subj_emoji(user['class'])}</h2><p><b>Nickname:</b> {nickname}</p><p><b>Class:</b> {user['class']} {user.get('dept','')}</p><p><b>Referral Link:</b><input class=readonly-box readonly value='{BASE_URL}/register?ref={nickname}'></p><p><b>Referral Bonus:</b> 5 days free per paid referral</p></div><h3>🔍 Add Friends (Scout 5)</h3>"
         for u in batch:
-            verified_tag = " <span class=badge style='background:#28a745'>✓ Verified</span>" if u['is_verified'] else ""
-            html+=f"<div class=friend-card><div class=friend-avatar>{u['nickname'][0].upper()}</div><div style='flex:1'><b>{u['name']}</b>{verified_tag}<br><small>{u['nickname']} - {u['class']}</small></div><a class=btn blue href=/add_friend/{u['nickname']}?offset={offset} style='width:auto;padding:8px 15px;max-width:80px'>Add</a></div>"
+            # FIX 3: HIDE OTHER USERS PAID STATUS - NO BADGE HERE
+            html+=f"<div class=friend-card><div class=friend-avatar>{u['nickname'][0].upper()}</div><div style='flex:1'><b>{u['name']}</b><br><small>{u['nickname']} - {u['class']}</small></div><a class=btn blue href=/add_friend/{u['nickname']}?offset={offset} style='width:auto;padding:8px 15px;max-width:80px'>Add</a></div>"
         next_offset = offset + FRIENDS_BATCH
         if next_offset < len(filtered):
             html+=f"<a class='btn orange' href=/me?offset={next_offset}>🔍 Scout - Show Next 5</a>"
         else:
             html+=f"<a class=btn gray href=/me?offset=0>🔄 Scout Again From Start</a>"
-        html+=f"<a class=btn red href=/logout style='margin-top:20px'>🚪 Logout</a><button class=btn blue onclick='history.back()'>⬅️ Back</button>"
+        html+=f"<a class=btn red href=/logout style='margin-top:20px'>🚪 Logout</a>"
     return render_template_string(BASE, title="Me", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
-
 @app.route('/accept/<f>')
 @login_required
 def accept_friend(nickname, user, f):
@@ -784,6 +809,7 @@ def add_friend(nickname, user, f):
             db.execute(sa.text("INSERT INTO friend_requests (from_nickname, to_nickname) VALUES (:u,:f)"), {"u": nickname, "f": f})
             db.commit()
     return redirect("/me?offset="+request.args.get('offset','0'))
+
 @app.route('/dm/<other>', methods=["GET","POST"])
 @login_required
 def dm_page(nickname, user, other):
@@ -791,14 +817,12 @@ def dm_page(nickname, user, other):
         db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname}); db.commit()
         other_user = db.execute(sa.text("SELECT * FROM users WHERE nickname=:o"), {"o": other}).mappings().first()
         if not other_user: return redirect("/chat")
-
         del_id = request.args.get('del_msg')
         if del_id:
             msg = db.execute(sa.text("SELECT from_nickname FROM dms WHERE id=:i"), {"i": int(del_id)}).scalar()
             if msg == nickname or nickname == 'motiz_support':
                 db.execute(sa.text("DELETE FROM dms WHERE id=:i"), {"i": int(del_id)}); db.commit()
             return redirect(f"/dm/{other}")
-
         all_dms = db.execute(sa.text("SELECT * FROM dms WHERE (from_nickname=:u AND to_nickname=:o) OR (from_nickname=:o AND to_nickname=:u) ORDER BY id ASC"), {"u": nickname, "o": other}).mappings().all()
         for m in all_dms:
             if m['to_nickname']==nickname:
@@ -812,15 +836,14 @@ def dm_page(nickname, user, other):
                 if changed:
                     db.execute(sa.text("UPDATE dms SET read_by=:r, delivered_to=:d WHERE id=:i"), {"r": json.dumps(read_by), "d": json.dumps(delivered), "i": m['id']})
         db.commit()
-
         if request.method=="POST" and request.form.get("text"):
             txt = request.form["text"][:700]
             reply_to = request.form.get("reply_to","")[:200]
-            full_text = f"Reply to: {reply_to} | {txt}" if reply_to else txt
+            full_text = f"Reply to: {reply_to}\n{txt}" if reply_to else txt
             db.execute(sa.text("INSERT INTO dms (from_nickname, to_nickname, text, time) VALUES (:f,:t,:txt,:tm)"), {"f": nickname, "t": other, "txt": full_text, "tm": str(datetime.now(NIGERIA_TZ))})
             db.commit()
+            # PRG pattern - redirect so back button does NOT show typed text again
             return redirect(f"/dm/{other}")
-
         dms = db.execute(sa.text("SELECT * FROM dms WHERE (from_nickname=:u AND to_nickname=:o) OR (from_nickname=:o AND to_nickname=:u) ORDER BY id ASC"), {"u": nickname, "o": other}).mappings().all()
 
     chat_html = ""
@@ -841,22 +864,19 @@ def dm_page(nickname, user, other):
             tick = ""
         cls = "me" if is_me else "other"
         t12 = format_12h(m['time'])
-        # FIXED: No backslash in f-string
-        safe_text = m['text'].replace("\n", "<br>")
-        raw_snippet = m['text'][:80].replace("'", "").replace('"', "").replace("\n", " ")
-        bubble_class = "me bubble" if is_me else "other bubble"
-        chat_msg_class = "chat-msg me" if is_me else "chat-msg other"
-        # reply formatting
+        text_display = m['text'].replace("\n","<br>")
         if "Reply to:" in m['text']:
-            parts = m['text'].split("|", 1)
-            reply_part = parts[0] if len(parts) > 0 else ""
-            main_part = parts[1] if len(parts) > 1 else m['text']
-            safe_text = f"<div style='background:rgba(0,0,0,0.15);padding:5px;border-radius:5px;margin-bottom:5px;font-size:0.8rem;border-left:3px solid #0f3460'>{reply_part}</div>{main_part}"
-
-        chat_html += f"<div class='{chat_msg_class}' onclick=\"showMenu(event,{m['id']},'{raw_snippet}')\"><div class='{bubble_class}'><div>{safe_text}</div><div class='bubble-time'>{t12} {tick}</div></div></div>"
+            parts = m['text'].split("\n",1)
+            text_display = f"<div style='background:rgba(0,0,0,0.1);padding:5px;border-radius:5px;margin-bottom:5px;font-size:0.8rem;border-left:3px solid #0f3460'>{parts[0]}</div>{parts[1] if len(parts)>1 else ''}"
+        safe_text = m['text'][:80].replace("'","").replace('"',"").replace("\n"," ")
+        chat_html+=f"""<div class='chat-msg {cls}' oncontextmenu="showMenu(event,{m['id']},'{safe_text}'); return false;" onclick="showMenu(event,{m['id']},'{safe_text}')">
+        <div class='bubble {cls}' id='msg-{m['id']}'><div class='bubble-text'>{text_display}</div><div class='bubble-time'>{t12} {tick}</div></div></div>"""
 
     timer_js = Markup(f"""
     setTimeout(()=>{{ window.scrollTo(0, document.body.scrollHeight); }}, 300);
+    // FIX 6: Back button in DM goes to /chat, not history that shows typed text
+    let exitBtn = document.querySelector('.exit-btn');
+    if(exitBtn) exitBtn.setAttribute('onclick', "location.href='/chat'");
     let lastCount = {len(dms)};
     setInterval(()=>{{
         fetch('/check_dm/{other}').then(r=>r.json()).then(data=>{{
@@ -876,31 +896,32 @@ def dm_page(nickname, user, other):
             }}
         }});
     }}, 3000);
+    let replyText = '';
     function showMenu(e, id, text){{
         e.preventDefault();
         let menu = document.getElementById('msgMenu');
         if(!menu){{
             menu = document.createElement('div');
             menu.id='msgMenu';
-            menu.style='position:fixed;background:white;border:1px solid #ccc;border-radius:8px;padding:8px;z-index:10000;box-shadow:0 4px 10px rgba(0,0,0,0.2)';
+            menu.style='position:fixed;background:white;border:1px solid #ccc;border-radius:8px;padding:5px;z-index:10000;box-shadow:0 4px 10px rgba(0,0,0,0.2)';
             document.body.appendChild(menu);
         }}
-        menu.innerHTML = '<button onclick="doReply('+id+',`'+text+'`)" class=btn blue style=padding:5px;margin:2px>Reply</button><button onclick="doCopy(`'+text+'`)" class=btn gray style=padding:5px;margin:2px>Copy</button><button onclick="doDelete('+id+')" class=btn red style=padding:5px;margin:2px>Delete</button><button onclick="this.parentElement.style.display=`none`" class=btn gray style=padding:5px;margin:2px>X</button>';
+        menu.innerHTML = `<button onclick="doReply(${{id}},'${{text}}')" class=btn blue style='padding:5px;margin:2px'>↩️ Reply</button><button onclick="doCopy('${{text}}')" class=btn gray style='padding:5px;margin:2px'>📋 Copy</button><button onclick="doDelete(${{id}})" class=btn red style='padding:5px;margin:2px'>🗑️ Delete</button><button onclick="this.parentElement.style.display='none'" class=btn gray style='padding:5px;margin:2px'>X</button>`;
         menu.style.left = e.pageX+'px'; menu.style.top = e.pageY+'px'; menu.style.display='block';
     }}
     function doReply(id, text){{ document.getElementById('replyPreview').style.display='flex'; document.getElementById('replyPreviewText').innerText=text.substring(0,50); document.getElementById('replyToInput').value=text; document.getElementById('msgMenu').style.display='none'; }}
     function doCopy(text){{ navigator.clipboard.writeText(text); document.getElementById('msgMenu').style.display='none'; }}
-    function doDelete(id){{ if(confirm('Delete?')) window.location.href='/dm/{other}?del_msg='+id; }}
+    function doDelete(id){{ if(confirm('Delete this message?')){{ window.location.href='/dm/{other}?del_msg='+id; }} }}
     function cancelReply(){{ document.getElementById('replyPreview').style.display='none'; document.getElementById('replyToInput').value=''; }}
+    document.addEventListener('click', function(e){{ if(!e.target.closest('#msgMenu') &&!e.target.closest('.bubble')){{ let m=document.getElementById('msgMenu'); if(m) m.style.display='none'; }} }});
     """)
 
+    # FIX 3: Hide verified for other user, only show for MOTIZ SUPPORT
     verified_badge = ""
     if other == 'motiz_support':
-        verified_badge = " <span class=badge style='background:gold;color:#0f3460'>VERIFIED</span>"
-    elif other_user.get('is_verified'):
-        verified_badge = " <span class=badge style='background:#28a745'>Verified Paid</span>"
+        verified_badge = " <span class=badge style='background:gold;color:#0f3460;white-space:nowrap'>✓ VERIFIED SUPPORT</span>"
 
-    content = f"<h3>{other_user['name']}{verified_badge}</h3><div id=chatBox>{chat_html}</div><form method=POST class=chat-input-fixed><div id=replyPreview class=reply-preview style='display:none'><span id=replyPreviewText></span><button type=button onclick='cancelReply()' style='background:red;color:white;border:none;border-radius:50%;width:20px'>X</button></div><input type=hidden name=reply_to id=replyToInput><div style='display:flex;gap:5px'><input name=text placeholder='Type... max 700' required maxlength=700 style='flex:1'><button class=send-img-btn><img src={SEND_BTN_URL}></button></div></form><button class=btn blue onclick='history.back()' style='margin-bottom:120px'>Back</button><div id=msgMenu style='display:none'></div>"
+    content = f"<h3>💬 {other_user['name']}{verified_badge} ({format_last_seen(other_user.get('last_seen'))})</h3><div id=chatBox>{chat_html}</div><form method=POST class=chat-input-fixed><div id=replyPreview class=reply-preview style='display:none'><span id=replyPreviewText></span><button type=button onclick='cancelReply()' style='background:red;color:white;border:none;border-radius:50%;width:20px'>X</button></div><input type=hidden name=reply_to id=replyToInput><div style='display:flex;gap:5px'><input name=text id=chatInput placeholder='Type message... (max 700)' required autocomplete=off maxlength=700 style='flex:1'><button class=send-img-btn><img src={SEND_BTN_URL}></button></div></form><div id=msgMenu style='display:none'></div>"
     return render_template_string(BASE, title=f"Chat {other}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
 
 @app.route('/check_dm/<other>')
@@ -920,7 +941,7 @@ def create_group(nickname, user):
                 db.execute(sa.text("INSERT INTO groups (name, creator, members) VALUES (:n,:c,:m)"), {"n": name, "c": nickname, "m": json.dumps([nickname])})
                 db.commit()
             return redirect("/chat")
-    return render_template_string(BASE, title="Create Group", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>Create Group</h2><form method=POST><input name=name placeholder='Group Name' required maxlength=50><button class=btn>Create Group</button></form><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"), timer_script="")
+    return render_template_string(BASE, title="Create Group", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>Create Group</h2><form method=POST><input name=name placeholder='Group Name' required maxlength=50><button class=btn>Create Group</button></form></div>"), timer_script="")
 
 @app.route('/group/<int:gid>', methods=["GET","POST"])
 @login_required
@@ -954,7 +975,6 @@ def group_page(nickname, user, gid):
         friends_to_add = [f for f in user.get('friends', []) if f not in members and f!= 'motiz_support']
         friends_options = "".join([f"<a class=btn blue href=/group/{gid}?add_member={f} style='margin:3px;width:auto;padding:6px 10px;font-size:0.8rem;display:inline-block;max-width:120px'>➕ Add {f}</a>" for f in friends_to_add])
 
-    # HIDE GROUP MEMBERS AS YOU REQUESTED - Only show count, not full list
     html = f"<div class=card><h3>👥 {g['name']}</h3><p>Creator: {g['creator']} | Members: {len(members)} <small>(hidden for privacy)</small></p></div>"
     if friends_to_add:
         html+=f"<div class=card><h4>Add Members (Friends only):</h4>{friends_options}</div>"
@@ -963,9 +983,12 @@ def group_page(nickname, user, gid):
         cls = "me" if is_me else "other"
         t12 = format_12h(m.get('time',''))
         html+=f"<div class='chat-msg {cls}'><div class='bubble {cls}'><b>{m['name']}</b><br>{m['text']}<div class='bubble-time'>{t12}</div></div></div>"
-    html+=f"<form method=POST class=chat-input-fixed><input name=text placeholder='Type message... (max 700)' required maxlength=700><button class=send-img-btn><img src={SEND_BTN_URL}></button></form><button class=btn blue onclick='history.back()' style='margin-bottom:100px'>⬅️ Back</button>"
-    return render_template_string(BASE, title=g['name'], header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
-
+    html+=f"<form method=POST class=chat-input-fixed><input name=text placeholder='Type message... (max 700)' required maxlength=700><button class=send-img-btn><img src={SEND_BTN_URL}></button></form>"
+    timer_js = Markup("""
+    let exitBtn = document.querySelector('.exit-btn');
+    if(exitBtn) exitBtn.setAttribute('onclick', "location.href='/chat'");
+    """)
+    return render_template_string(BASE, title=g['name'], header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script=timer_js)
 @app.route('/admin', methods=["GET","POST"])
 @login_required
 def admin(nickname, user):
@@ -1067,6 +1090,7 @@ def admin(nickname, user):
                     set_setting("notices", json.dumps(NOTICES)); error = "<div class=success>Notice Updated</div>"
                 if "delete_notice" in request.form:
                     nid = int(request.form["notice_id"])
+                    global NOTICES
                     NOTICES = [n for n in NOTICES if n.get('id')!=nid]
                     set_setting("notices", json.dumps(NOTICES)); error = "<div class=error>Notice Deleted</div>"
                 if "pin_notice" in request.form:
@@ -1146,7 +1170,7 @@ def admin(nickname, user):
 <div class="card"><h2>⚙️ GROUP 3: MANAGE</h2><a href=/admin?manage=questions class='btn blue'>📝 Manage Questions</a><a href=/admin?manage=lessons class='btn blue'>📚 Manage Lessons</a><a href=/admin?manage=notices class='btn orange'>📢 Manage Notices</a><a href=/admin?manage=complaints class='btn red'>📩 Complaints ({complaints_count})</a></div>
 <div class="card"><h2>👥 GROUP 4: PAYMENTS + POST NOTICE</h2>{pending_html or "<p>No pending</p>"}<a href=/admin_attendance class='btn blue'>👥 Attendance + Referrals</a><form method=POST style="margin-top:15px"><h3>Post Notice</h3><input name=notice_title placeholder="Title" required><textarea name=notice_text placeholder="Message" required></textarea><input name=media_link placeholder="Imgur link"><button name=post_notice class='btn'>📢 Post Notice</button></form></div>
 <div class="card"><h2>🛑 DANGER ZONE</h2><form method=POST onsubmit="return confirm('Delete ALL?')"><button name=clear_all_data class='btn red'>⚠️ Clear All</button></form></div>
-<div class="card"><h2>🔒 GROUP 5: SETTINGS</h2><form method="POST"><input type="password" name="old_pass" placeholder="Current" required><input type="password" name="new_pass" placeholder="New" required><button name="change_pass" class='btn orange'>🔒 Change Pass</button></form><button class=btn blue onclick='history.back()'>⬅️ Back</button></div>"""
+<div class="card"><h2>🔒 GROUP 5: SETTINGS</h2><form method="POST"><input type="password" name="old_pass" placeholder="Current" required><input type="password" name="new_pass" placeholder="New" required><button name="change_pass" class='btn orange'>🔒 Change Pass</button></form></div>"""
     return render_template_string(BASE, title="Admin V33", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(form), timer_script="")
 
 @app.route('/admin_attendance')
@@ -1160,7 +1184,7 @@ def admin_attendance(nickname, user):
         ls_text = format_last_seen(u['last_seen']) if u['last_seen'] else "Never"
         verified_icon = "✅ Verified Paid" if u['is_verified'] else "Free"
         table += f"<tr><td>{u['name']}<br><small>@{u['nickname']}</small> {verified_icon}</td><td>{u['class']} {u.get('dept','') or ''}</td><td>{u['q_used']}</td><td>{verified_icon}</td><td>{u['lesson_expiry'] or 'None'}</td><td>{ls_text}</td><td>{u['referral_count'] or 0}</td><td>{u['free_days'] or 0}</td></tr>"
-    content = f"<div class=card><h2>Attendance V33 FINAL</h2><p>Total: {len(users)}</p><div style='overflow-x:auto'><table style='width:100%;font-size:0.75rem;border-collapse:collapse' border=1><tr><th>Name</th><th>Class</th><th>Q Used</th><th>Status</th><th>Expiry</th><th>Last Seen</th><th>Refs</th><th>Free Days</th></tr>{table}</table></div><button class='btn blue' onclick='history.back()'>⬅️ Back</button></div>"
+    content = f"<div class=card><h2>Attendance V33 FINAL</h2><p>Total: {len(users)}</p><div style='overflow-x:auto'><table style='width:100%;font-size:0.75rem;border-collapse:collapse' border=1><tr><th>Name</th><th>Class</th><th>Q Used</th><th>Status</th><th>Expiry</th><th>Last Seen</th><th>Refs</th><th>Free Days</th></tr>{table}</table></div></div>"
     return render_template_string(BASE, title="Attendance V33", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
 if __name__ == '__main__':
