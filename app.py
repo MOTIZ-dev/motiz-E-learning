@@ -315,7 +315,7 @@ function saveSub(sub){{ fetch('/save-subscription', {{method:'POST', headers:{{'
 
 def get_header(nickname,user, show_nav=True, show_favicon=False):
     if not user: return ""
-    exit_html = f'<button onclick="if(history.length>1){{history.back()}} else {{location.href=\'/main\'}}" class="exit-btn">⬅️</button>'
+        exit_html = f'<button onclick="location.href=\'/main\'" class="exit-btn">⬅️</button>'
     favicon_html = f'<img src="{FAVICON_URL}" class="logo">' if show_favicon else ""
     theme_html = f'<button class="theme-btn" id="themeToggle" onclick="toggleTheme()">🌙</button>'
     unread = get_unread_count(nickname) if nickname!='motiz_support' else 0
@@ -874,9 +874,9 @@ def dm_page(nickname, user, other):
 
     timer_js = Markup(f"""
     setTimeout(()=>{{ window.scrollTo(0, document.body.scrollHeight); }}, 300);
-    // FIX 6: Back button in DM goes to /chat, not history that shows typed text
+        // FIX 6: Back button in DM goes to /chat, no history loop
     let exitBtn = document.querySelector('.exit-btn');
-    if(exitBtn) exitBtn.setAttribute('onclick', "location.href='/chat'");
+    if(exitBtn) exitBtn.setAttribute('onclick', "location.replace('/chat')");
     let lastCount = {len(dms)};
     setInterval(()=>{{
         fetch('/check_dm/{other}').then(r=>r.json()).then(data=>{{
@@ -984,9 +984,10 @@ def group_page(nickname, user, gid):
         t12 = format_12h(m.get('time',''))
         html+=f"<div class='chat-msg {cls}'><div class='bubble {cls}'><b>{m['name']}</b><br>{m['text']}<div class='bubble-time'>{t12}</div></div></div>"
     html+=f"<form method=POST class=chat-input-fixed><input name=text placeholder='Type message... (max 700)' required maxlength=700><button class=send-img-btn><img src={SEND_BTN_URL}></button></form>"
-    timer_js = Markup("""
+        timer_js = Markup("""
     let exitBtn = document.querySelector('.exit-btn');
-    if(exitBtn) exitBtn.setAttribute('onclick', "location.href='/chat'");
+    if(exitBtn) exitBtn.setAttribute('onclick', "location.replace('/chat')");
+    """)
     """)
     return render_template_string(BASE, title=g['name'], header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script=timer_js)
 @app.route('/admin', methods=["GET","POST"])
