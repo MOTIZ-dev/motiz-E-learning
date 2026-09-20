@@ -984,7 +984,7 @@ def group_page(nickname, user, gid):
         t12 = format_12h(m.get('time',''))
         html+=f"<div class='chat-msg {cls}'><div class='bubble {cls}'><b>{m['name']}</b><br>{m['text']}<div class='bubble-time'>{t12}</div></div></div>"
     html+=f"<form method=POST class=chat-input-fixed><input name=text placeholder='Type message... (max 700)' required maxlength=700><button class=send-img-btn><img src={SEND_BTN_URL}></button></form>"
-        timer_js = Markup("""
+    timer_js = Markup("""
     let exitBtn = document.querySelector('.exit-btn');
     if(exitBtn) exitBtn.setAttribute('onclick', "location.replace('/chat')");
     """)
