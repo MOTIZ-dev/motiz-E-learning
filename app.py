@@ -1161,10 +1161,10 @@ def admin(nickname, user):
         manage_html = f"<div class=card><h2>📚 Manage Lessons</h2>{l_list or '<p>No lessons</p>'}</div>"
     elif manage == "notices":
         manage_html = f"<div class=card><h2>📢 Manage Notices</h2>{manage_notice_html or '<p>No notices</p>'}</div>"
-    elif manage == "complaints":
+        elif manage == "complaints":
         manage_html = f"<div class=card><h2>📩 Complaints Inbox ({complaints_count} Pending)</h2>{complaints_html}</div>"
 
-    html = f"""
+    html = f'''
     {edit_notice_form}{add_q_form}{bulk_form}{add_l_form}{manage_html}
     <div class="card"><h2>GROUP 1: CBT QUESTIONS</h2><div style="display:flex;flex-direction:column;gap:8px">{group1}</div></div>
     <div class="card"><h2>GROUP 2: LESSONS</h2><div style="display:flex;flex-direction:column;gap:8px">{group2}</div></div>
@@ -1172,7 +1172,7 @@ def admin(nickname, user):
     <div class="card"><h2>GROUP 4: PAYMENTS + POST NOTICE</h2>{pending_html or "<p>No pending</p>"}<a href=/admin_attendance class='btn blue'>Attendance + Referrals</a><form method=POST style="margin-top:15px"><h3>Post Notice</h3><input name=notice_title placeholder="Title" required><textarea name=notice_text placeholder="Message" required></textarea><input name=media_link placeholder="Imgur link"><button name=post_notice class='btn'>Post Notice</button></form></div>
     <div class="card"><h2>DANGER ZONE</h2><form method=POST onsubmit="return confirm('Delete ALL?')"><button name=clear_all_data class='btn red'>Clear All</button></form></div>
     <div class="card"><h2>GROUP 5: SETTINGS</h2><form method="POST"><input type="password" name="old_pass" placeholder="Current" required><input type="password" name="new_pass" placeholder="New" required><button name="change_pass" class='btn orange'>Change Pass</button></form></div>
-    """
+    '''
     return render_template_string(BASE.replace("__HEADER__", get_header(nickname, user)).replace("__CONTENT__", html), nickname=nickname, user=user)
 
 @app.route("/admin_attendance")
