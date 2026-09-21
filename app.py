@@ -1,7 +1,7 @@
 from flask import Flask, render_template_string, request, redirect, session, Response
 from markupsafe import Markup
 from datetime import date, datetime, timedelta
-import json, os, urllib.parse, csv, math, random
+import json, os, urllib.parse, csv, math
 from io import StringIO
 from functools import wraps
 import sqlalchemy as sa
@@ -120,132 +120,6 @@ def ensure_motiz_support():
         db.commit()
 ensure_motiz_support()
 
-def seed_data():
-    with DBSession() as db:
-        count_q = db.execute(sa.text("SELECT COUNT(*) FROM questions")).scalar() or 0
-        if count_q >= 1000:
-            return
-        # === WAEC STANDARD BANKS ===
-        WAEC_SS3_MATH = [
-            ("If log₁₀2 =0.3010 and log₁₀3=0.4771, evaluate log₁₀ 6", "0.7781", "0.1761", "0.3010", "1.3010", "0.7781"),
-            ("Solve: 3x² - 5x - 2 =0", "2 and -1/3", "2 and 1/3", "-2 and 1/3", "3 and -2", "2 and -1/3"),
-            ("The sum of first 5 terms of AP 2,5,8... is?", "40", "32", "35", "45", "40"),
-            ("If sinθ=3/5, find cosθ (θ acute)", "4/5", "3/4", "5/4", "5/3", "4/5"),
-            ("Factorize completely: 6x² +7x -20", "(3x-4)(2x+5)", "(3x+4)(2x-5)", "(6x-4)(x+5)", "(2x+4)(3x-5)", "(3x-4)(2x+5)"),
-            ("Find the inverse of matrix [[2,3],[1,2]]", "[[2,-3],[-1,2]]", "[[-2,3],[1,-2]]", "[[2,3],[-1,-2]]", "[[3,2],[2,1]]", "[[2,-3],[-1,2]]"),
-            ("WAEC 2022: The probability of picking a defective bulb is 0.02. In a batch of 500, how many defective?", "10", "20", "25", "50", "10"),
-            ("Find x if 2^(x+1)=8", "2", "3", "1", "4", "2"),
-            ("Mean deviation of 2,4,6,8,10", "2.4", "3.0", "2.0", "4.0", "2.4"),
-            ("If y = x³ -3x², find dy/dx", "3x² -6x", "x² -6x", "3x² -3x", "x³ -6", "3x² -6x"),
-        ]
-        WAEC_SS3_ENGLISH = [
-            ("Choose the word with correct stress: 'photograph'", "PHOtograph", "phoTOgraph", "photoGRAPH", "photograPH", "PHOtograph"),
-            ("WAEC 2021: He ___ since morning", "has been reading", "is reading", "reads", "had read", "has been reading"),
-            ("Synonym of 'gregarious' as used in WAEC", "sociable", "aggressive", "generous", "dangerous", "sociable"),
-            ("Choose correct idiom: He was caught ___ handed", "red", "blue", "black", "white", "red"),
-            ("Which is correct? 'The number of students ___ absent'", "is", "are", "were", "have been", "is"),
-            ("Antonym of 'ephemeral' (WAEC 2023)", "permanent", "brief", "fragile", "temporary", "permanent"),
-            ("The figure 'The classroom was a zoo' is", "metaphor", "simile", "personification", "hyperbole", "metaphor"),
-            ("After the meeting, he was asked to ___ the proposal", "expatiate on", "expatiate", "expatiate with", "expatiate about", "expatiate on"),
-            ("Choose correct: Neither John nor his friends ___ there", "was", "were", "is", "has been", "was"),
-            ("WAEC: 'to turn a deaf ear' means", "to ignore", "to listen carefully", "to be deaf", "to hear faintly", "to ignore"),
-        ]
-        WAEC_SS3_PHYSICS = [
-            ("WAEC 2022: A car accelerates from rest at 2m/s² for 5s. Distance covered?", "25m", "10m", "20m", "50m", "25m"),
-            ("The dimension of power is", "ML²T⁻³", "MLT⁻²", "ML²T⁻²", "MLT⁻³", "ML²T⁻³"),
-            ("Half-life of element is 5 days. Fraction remaining after 15 days?", "1/8", "1/4", "1/2", "1/16", "1/8"),
-            ("Critical angle for glass n=1.5 is?", "41.8°", "30°", "60°", "45°", "41.8°"),
-            ("In photoelectric effect, stopping potential depends on", "frequency", "intensity", "time", "work function only", "frequency"),
-            ("WAEC: Which is vector?", "momentum", "work", "energy", "power", "momentum"),
-            ("A transformer has 200 turns primary, 1000 secondary. If primary 20V, secondary?", "100V", "40V", "4V", "200V", "100V"),
-            ("Unit of inductance is", "Henry", "Farad", "Ohm", "Tesla", "Henry"),
-            ("Escape velocity formula is", "√(2gR)", "gR", "2gR", "√(gR)", "√(2gR)"),
-            ("De Broglie wavelength λ =?", "h/p", "p/h", "h×p", "E/h", "h/p"),
-        ]
-        # JSS1 VERY EASY
-        JSS1_MATH = [
-            ("What is 5 + 7?", "12", "10", "13", "11", "12"),
-            ("What is half of 20?", "10", "5", "15", "20", "10"),
-            ("How many sides does triangle have?", "3", "4", "5", "6", "3"),
-            ("10 x 2 =?", "20", "12", "18", "22", "20"),
-            ("Which is even? 3,5,8,9", "8", "3", "5", "9", "8"),
-        ]
-        # Default for other classes
-        DEFAULT_EASY = [
-            ("What is 2+2?", "4", "3", "5", "6", "4"),
-            ("Capital of Nigeria is?", "Abuja", "Lagos", "Kano", "Ibadan", "Abuja"),
-            ("LCM of 4 and 6 is?", "12", "6", "8", "24", "12"),
-        ]
-        def get_bank(class_key, subject):
-            ck = class_key.upper()
-            subj = subject.lower()
-            if "SS3" in ck:
-                if "math" in subj: return WAEC_SS3_MATH
-                if "english" in subj: return WAEC_SS3_ENGLISH
-                if "physics" in subj: return WAEC_SS3_PHYSICS
-                if "chemistry" in subj: return [("WAEC 2023: Electronic config of Na (11)?", "2,8,1", "2,8,2", "2,7,2", "2,8,3", "2,8,1"), ("pH of 0.01M HCl?", "2", "1", "3", "12", "2"), ("Alkanes general formula?", "CnH2n+2", "CnH2n", "CnH2n-2", "CnH2n+1", "CnH2n+2")] + WAEC_SS3_MATH[:7]
-                if "biology" in subj: return [("WAEC: Site of photosynthesis?", "Chloroplast", "Mitochondrion", "Nucleus", "Ribosome", "Chloroplast"), ("Blood group O can donate to?", "All", "A only", "B only", "O only", "All")] + WAEC_SS3_PHYSICS[:8]
-                if "economics" in subj: return [("WAEC: Scale of preference means?", "Listing wants in order of importance", "Want for money", "Desire for goods", "Need for choice", "Listing wants in order of importance"), ("Demand curve slopes?", "Downwards", "Upwards", "Horizontal", "Vertical", "Downwards")] + WAEC_SS3_ENGLISH[:8]
-                return WAEC_SS3_MATH
-            elif "SS2" in ck:
-                # SS2 = medium WAEC
-                return [("Solve: x+5=12, x=?", "7", "5", "12", "17", "7"), ("Mean of 4,6,8?", "6", "5", "7", "8", "6"), ("LCM 8,12?", "24", "12", "36", "48", "24")] + WAEC_SS3_MATH[:7]
-            elif "SS1" in ck:
-                return [("What is 3²?", "9", "6", "3", "12", "9"), ("Solve 2x=10", "5", "2", "10", "20", "5"), ("Area of square side 4?", "16", "8", "12", "20", "16")] + DEFAULT_EASY
-            elif "JSS3" in ck:
-                return [("What is 10% of 200?", "20", "10", "30", "200", "20"), ("Angle in triangle sum?", "180°", "90°", "360°", "270°", "180°")] + JSS1_MATH
-            elif "JSS1" in ck or "JSS2" in ck:
-                return JSS1_MATH + DEFAULT_EASY
-            else:
-                return DEFAULT_EASY
-
-        inserted = 0
-        batch_counter = 0
-        for class_key, subjects in SUBJECTS.items():
-            cls_parts = class_key.split("_")
-            cls = cls_parts[0]
-            dept = cls_parts[1] if len(cls_parts) > 1 else ""
-            for subj in subjects:
-                key = f"{class_key}_{subj}"
-                existing = db.execute(sa.text("SELECT COUNT(*) FROM questions WHERE key=:k"), {"k": key}).scalar() or 0
-                if existing >= 100:
-                    continue
-                bank = get_bank(class_key, subj)
-                for i in range(100):
-                    if i < len(bank):
-                        q,a,b,c,d,ans = bank[i]
-                    else:
-                        base = bank[i % len(bank)]
-                        q,a,b,c,d,ans = base
-                        q = f"{q} (Q{i+1})"
-                    # Add class tag
-                    q_full = f"[{class_key} WAEC] {q}" if "SS3" in class_key else f"[{class_key}] {q}"
-                    db.execute(sa.text("INSERT INTO questions (key, q, options, ans) VALUES (:k, :q, :o, :a)"),
-                               {"k": key, "q": q_full, "o": json.dumps([a,b,c,d]), "a": ans})
-                    inserted += 1
-                    batch_counter += 1
-                    if batch_counter % 500 == 0:
-                        db.commit()
-                exist_l = db.execute(sa.text("SELECT id FROM lessons WHERE class=:c AND dept=:d AND subject=:s"), {"c": cls, "d": dept, "s": subj}).scalar()
-                if not exist_l:
-                    notes = f"""MOTIZ WAEC LESSON: {subj} for {class_key}
-LEVEL: {'WAEC STANDARD - Past Questions 2015-2025' if 'SS3' in class_key else 'Graded for '+cls}
-1. Definition & WAEC syllabus
-2. Key formulas & examples (WAEC style)
-3. Solved past questions
-4. Assignment: Practice 100 CBT WAEC questions
-Prepared by MOTIZ SUPPORT - WAEC Standard"""
-                    db.execute(sa.text("INSERT INTO lessons (class, dept, subject, title, notes, date, media_link) VALUES (:c, :d, :s, :t, :n, :date, :m)"),
-                               {"c": cls, "d": dept, "s": subj, "t": f"{subj} WAEC Complete {class_key}", "n": notes, "date": str(date.today()), "m": ""})
-                    if batch_counter % 100 == 0:
-                        db.commit()
-        db.commit()
-
-try:
-    seed_data()
-except Exception as e:
-    print(f"Seed error: {e}")
-
 def get_setting(k, d=""):
     with DBSession() as db:
         v = db.execute(sa.text("SELECT value FROM settings WHERE key=:k"), {"k": k}).scalar()
@@ -255,7 +129,7 @@ def set_setting(k, v):
         db.execute(sa.text("INSERT INTO settings (key, value) VALUES (:k, :v) ON CONFLICT (key) DO UPDATE SET value=:v"), {"k": k, "v": v})
         db.commit()
 ADMIN_PASS = get_setting("admin_pass", ADMIN_PASS)
-NOTICES = json.loads(get_setting("notices", json.dumps([{"title":"Welcome","text":"Welcome to MOTIZ E-LEARNING! WAEC STANDARD FOR SS3","created_at": str(datetime.now(pytz.timezone('Africa/Lagos'))), "media_link": ""}])))
+NOTICES = json.loads(get_setting("notices", json.dumps([{"title":"Welcome","text":"Welcome to MOTIZ E-LEARNING!","created_at": str(datetime.now(pytz.timezone('Africa/Lagos'))), "media_link": ""}])))
 PINNED_NOTICE = get_setting("pinned_notice", "")
 
 def get_user():
@@ -366,18 +240,17 @@ body.dark{{--bg:#121212;--card:#1e1e1e;--text:#eee}} body.light{{--bg:#f0f2f5;--
 .nav{{display:flex;gap:5px;background:#16213e;padding:6px 5px;flex-wrap:wrap;position:fixed;top:70px;width:100%;z-index:999}}
 .nav a{{color:white!important;text-decoration:none;padding:5px 8px;border-radius:10px;border:1px solid #fff3;font-size:0.8rem;white-space:nowrap}}
 .nav a:visited{{color:white!important}}
-.container{{padding:10px;padding-top:135px;padding-bottom:130px}}
+.container{{padding:10px;padding-top:145px;padding-bottom:90px}}
 .card{{background:var(--card);padding:12px;margin:8px 0;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}}
-.card:last-child{{margin-bottom:130px!important}}
+.card:last-child{{margin-bottom:90px!important}}
 .btn{{background:#28a745;color:white!important;padding:10px;display:block;margin:8px auto;text-align:center;font-weight:bold;border:none;width:95%;max-width:350px;border-radius:8px;cursor:pointer}}
 .btn.red{{background:#e94560!important}}.btn.blue{{background:#0f3460!important;border:1px solid white}}.btn.orange{{background:#ff9800!important}}.btn.gray{{background:#555!important;width:90%;max-width:300px;font-size:0.85rem}}
 input,select,textarea{{width:100%;padding:10px;margin:5px 0;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;background:var(--card);color:var(--text)}}
 .badge{{background:#1DA1F2;color:white;padding:3px 8px;border-radius:10px;font-size:0.7rem;white-space:nowrap;display:inline-flex;align-items:center;line-height:1;max-width:100%}}
 .badge.gold{{background:gold;color:#0f3460;font-weight:bold;white-space:nowrap}}.badge.verified-paid{{background:#28a745;color:white;white-space:nowrap}}
-.timer{{background:#e94560;color:white;padding:12px;text-align:center;border-radius:8px;font-weight:bold;position:sticky;top:68px;z-index:998;margin-bottom:10px}}
-.option{{background:#e8eaed;padding:16px 18px;margin-bottom:12px;border-radius:12px;color:#000;display:flex;gap:12px;align-items:center;justify-content:flex-start;text-align:left;width:100%;box-sizing:border-box;cursor:pointer}}
-.option input[type="radio"]{{margin-right:12px;width:20px;height:20px;flex-shrink:0}}
-.option span{{flex:1;text-align:left;font-size:0.95rem}}
+.timer{{background:#e94560;color:white;padding:12px;text-align:center;border-radius:8px;font-weight:bold;position:sticky;top:92px;z-index:998;margin-bottom:10px}}
+.option{{background:#f0f2f5;padding:14px;margin:10px 0;border-radius:8px;color:black;display:flex;gap:12px;align-items:flex-start;justify-content:flex-start;text-align:left}}
+.option span{{flex:1;text-align:left}}
 .chat-msg{{display:flex;margin:8px 0;gap:8px}}.chat-msg.me{{justify-content:flex-end}}.chat-msg.other{{justify-content:flex-start}}
 .bubble{{padding:10px 14px;border-radius:18px;max-width:70%}}.me.bubble{{background:#2196f3!important;color:white!important}}.other.bubble{{background:#e0e0e0;color:#333}}
 .bubble-time{{font-size:11px;opacity:0.8;align-self:flex-end;margin-top:2px;display:flex;gap:6px}}
@@ -397,18 +270,16 @@ input,select,textarea{{width:100%;padding:10px;margin:5px 0;border-radius:5px;bo
 .bg-option{{width:35px;height:35px;border-radius:50%;display:inline-block;margin:4px;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.3)}}
 .bg-option.selected{{border:3px solid #0f3460;transform:scale(1.2)}}
 .like-row{{display:flex;gap:8px;justify-content:flex-start;align-items:center;margin-top:8px}}
-.dm-actions-top{{display:flex;flex-direction:row;gap:8px;justify-content:flex-end;padding:6px 10px;margin-bottom:5px}}
-.dm-actions-top a{{padding:4px 10px!important;font-size:12px!important;height:28px;border-radius:6px;width:auto!important;max-width:110px;margin:0!important;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:white}}
-.unread-badge-fix{{white-space:nowrap!important;display:inline-flex!important;align-items:center;line-height:1!important;max-width:fit-content}}
 </style></head><body>
 <div id="updateBanner">🔄 New version - <button onclick="location.reload(true)" style="background:white;color:#ff9800;border:none;padding:5px 10px;border-radius:5px">Update now</button></div>
 {{{{header}}}}<div class="container">{{{{content}}}}</div>
 <div id="fixedAdBar"><button onclick="document.getElementById('fixedAdBar').style.display='none'" style="position:absolute;top:2px;right:5px;background:#000;color:#fff;border:none;border-radius:50%;width:20px;height:20px">X</button><div id="adContainer" style="width:728px;max-width:100%;height:60px;display:flex;align-items:center;justify-content:center;"><script>atOptions = {{'key' : '{FIXED_AD_KEY}','format' : 'iframe','height' : 60,'width' : 728,'params' : {{}} }};</script><script src="https://www.highrevenueformat.com/{FIXED_AD_KEY}/invoke.js"></script></div></div>
-<div id="cbtSmallAd"><button onclick="document.getElementById('cbtSmallAd').style.display='none'" style="position:absolute;top:2px;right:5px;background:#000;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px">X</button><div id="cbtAdInner" style="width:320px;height:50px;display:flex;align-items:center;justify-content:center;"><script>atOptions = {{'key' : '{FIXED_AD_KEY}','format' : 'iframe','height' : 50,'width' : 320,'params' : {{}} }};</script><script src="https://www.highrevenueformat.com/{FIXED_AD_KEY}/invoke.js"></script></div></div>
+<div id="cbtSmallAd"><button onclick="document.getElementById('cbtSmallAd').style.display='none'" style="position:absolute;top:2px;right:5px;background:#000;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px">X</button><div id="cbtAdInner" style="width:320px;height:50px;display:flex;align-items:center;justify-content:center;font-size:11px">📢 CBT Ad 320x50</div></div>
 <div id="calcFloat" class="calc-float"><div style="display:flex;justify-content:space-between"><b>🧮 Calculator</b><button onclick="document.getElementById('calcFloat').style.display='none'" style="background:red;color:white;border:none;border-radius:50%;width:20px">X</button></div><input id="calcDisplay" readonly style="background:#111;color:#0f0;text-align:right;font-size:1.2rem"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:5px"><button class="btn gray" onclick="calcPress('7')">7</button><button class="btn gray" onclick="calcPress('8')">8</button><button class="btn gray" onclick="calcPress('9')">9</button><button class="btn orange" onclick="calcPress('/')">/</button><button class="btn gray" onclick="calcPress('4')">4</button><button class="btn gray" onclick="calcPress('5')">5</button><button class="btn gray" onclick="calcPress('6')">6</button><button class="btn orange" onclick="calcPress('*')">*</button><button class="btn gray" onclick="calcPress('1')">1</button><button class="btn gray" onclick="calcPress('2')">2</button><button class="btn gray" onclick="calcPress('3')">3</button><button class="btn orange" onclick="calcPress('-')">-</button><button class="btn gray" onclick="calcPress('0')">0</button><button class="btn gray" onclick="calcPress('.')">.</button><button class="btn blue" onclick="calcEval()">=</button><button class="btn orange" onclick="calcPress('+')">+</button><button class="btn red" onclick="calcClear()" style="grid-column:span 4">Clear</button></div></div>
 <button id="calcBtn" onclick="document.getElementById('calcFloat').style.display='block'" style="position:fixed;bottom:85px;right:15px;background:#ff9800;color:white;border:none;border-radius:50%;width:55px;height:55px;font-size:1.5rem;z-index:9997;display:none;box-shadow:0 4px 10px rgba(0,0,0,0.3)">🧮</button>
 <script>
 {{{{timer_script}}}}
+// ADS ON ALL SCREENS - FIXED
 if(window.location.pathname.startsWith('/cbt/')){{
   document.getElementById('fixedAdBar').style.display='none';
   document.getElementById('cbtSmallAd').style.display='flex';
@@ -505,19 +376,8 @@ def check_unread(nickname, user):
 def splash():
     return render_template_string(f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Welcome</title><link rel="icon" type="image/png" href="{FAVICON_URL}"><meta http-equiv="refresh" content="10;url=/login">
 <style>body{{margin:0;background:linear-gradient(135deg,#0f3460,#16213e);color:white;font-family:Segoe UI;display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;text-align:center}}.logo{{font-size:2.2rem;font-weight:bold;line-height:1.3}}.progress-bar{{width:200px;height:8px;background:#fff3;border-radius:10px;overflow:hidden;margin-top:20px}}.progress-fill{{height:100%;width:0%;background:white;animation:load 10s linear forwards}} @keyframes load{{0%{{width:0%}}100%{{width:100%}}}} </style></head><body>
-<audio id="bgMusic" loop preload="auto"><source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg"></audio>
-<div class="logo">MOTIZ<br>E-LEARNING<br>INSTITUTION</div><div class="subtext" style="margin-top:10px">Learn. Practice. Excel. WAEC STANDARD</div><div class="progress-bar"><div class="progress-fill"></div></div>
-<script>
-document.addEventListener('click', function(){{
-  var a=document.getElementById('bgMusic');
-  if(a){{ a.play().catch(()=>{{}}); }}
-}}, {{once:true}});
-window.addEventListener('load', function(){{
-  var a=document.getElementById('bgMusic');
-  if(a){{ a.play().catch(()=>{{}}); }}
-}});
-</script>
-</body></html>""")
+<audio autoplay loop><source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg"></audio>
+<div class="logo">MOTIZ<br>E-LEARNING<br>INSTITUTION</div><div class="subtext" style="margin-top:10px">Learn. Practice. Excel.</div><div class="progress-bar"><div class="progress-fill"></div></div><p style="font-size:12px;margin-top:15px">🔊 Music Playing...</p></body></html>""")
 
 @app.route('/register', methods=["GET","POST"])
 def register():
@@ -538,7 +398,7 @@ def register():
                     db.commit()
                     session["nickname"] = nickname; return redirect("/main")
     js = """<script>function d(){let c=document.getElementById('class').value;let x=document.getElementById('deptBox');x.innerHTML='';if(['SS1','SS2','SS3'].includes(c)){x.innerHTML='<label>Department *</label><select name=dept required><option value="">Select Department</option><option>Science</option><option>Commercial</option><option>Art</option></select>'}else{x.innerHTML='<input type=hidden name=dept value=>';}}</script>"""
-    form = f"<div class='card'><h2>Register - WAEC Standard for SS3</h2>{error}<form method=POST><input name=nickname placeholder='Nickname' required><input name=surname placeholder='Surname' required><input name=other placeholder='Other Name' required><input type=password name=password placeholder='Password' required><select name=class id=class onchange=d() required><option value=''>Select Class</option>{''.join([f'<option>{c}</option>' for c in CLASSES])}</select><div id=deptBox></div><button class=btn>Register</button><p>Already have account? <a href=/login>Login</a></p></form></div>{js}"
+    form = f"<div class='card'><h2>Register</h2>{error}<form method=POST><input name=nickname placeholder='Nickname' required><input name=surname placeholder='Surname' required><input name=other placeholder='Other Name' required><input type=password name=password placeholder='Password' required><select name=class id=class onchange=d() required><option value=''>Select Class</option>{''.join([f'<option>{c}</option>' for c in CLASSES])}</select><div id=deptBox></div><button class=btn>Register</button><p>Already have account? <a href=/login>Login</a></p></form></div>{js}"
     return render_template_string(BASE, title="Register", header="", content=Markup(form), timer_script="")
 
 @app.route('/login', methods=["GET","POST"])
@@ -575,7 +435,7 @@ def main(nickname, user):
                 media = f"<img src='{link}' class='lesson-media'>"
         time_12 = format_12h(n.get('created_at',''))
         notices_html += f"<div class='card'><div class=notice-title>📢 {n['title']}</div>{n['text']}{media}<small style='float:right'>{time_12}</small></div>"
-    return render_template_string(BASE, title="Home", header=Markup(get_header(nickname,user, show_nav=True, show_favicon=True, is_home=True)), content=Markup(f"<div class='card'><h2>Welcome {user['name']}</h2><p><b>Class:</b> {user['class']} {user.get('dept','')}</p><p><b>Standard:</b> {'WAEC PAST QUESTIONS' if 'SS3' in user['class'] else 'Graded for '+user['class']}</p></div>{pinned_html}<h3>General Notice</h3>{notices_html}<a class=btn href=/exam>Start CBT Exam (WAEC Standard)</a><a class=btn orange href=/daily>🏆 Daily Challenge (FREE)</a>"), timer_script="")
+    return render_template_string(BASE, title="Home", header=Markup(get_header(nickname,user, show_nav=True, show_favicon=True, is_home=True)), content=Markup(f"<div class='card'><h2>Welcome {user['name']}</h2><p><b>Class:</b> {user['class']} {user.get('dept','')}</p></div>{pinned_html}<h3>General Notice</h3>{notices_html}<a class=btn href=/exam>Start CBT Exam</a><a class=btn orange href=/daily>🏆 Daily Challenge (FREE)</a>"), timer_script="")
 
 @app.route('/logout')
 def logout():
@@ -607,16 +467,15 @@ def exam(nickname, user):
             limit = FREE_Q if not is_user_paid(user) else FREE_Q + PAID_Q
             done = min(prog, total_q, limit)
             emoji = subj_emoji(s)
-            waec_tag = " WAEC" if "SS3" in key else ""
             if done >= limit or (total_q>0 and done >= total_q):
-                btn = f"<div class='card' style='border:2px solid #28a745'><b>{emoji} {s}{waec_tag}</b><br><small>✅ Completed {done}/{min(limit,total_q)}</small><br><a class='btn blue cbt-btn-fix' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}?redo=1'>🔄 Redo / Reset</a></div>"
+                btn = f"<div class='card' style='border:2px solid #28a745'><b>{emoji} {s}</b><br><small>✅ Completed {done}/{min(limit,total_q)}</small><br><a class='btn blue cbt-btn-fix' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}?redo=1'>🔄 Redo / Reset</a></div>"
             else:
                 if not is_user_paid(user) and prog >= FREE_Q:
-                    btn = f"<div class='card cbt-btn-fix' style='border:2px solid #e94560'><b>{emoji} {s}{waec_tag}</b><br><small>🔒 Pay to continue (10/{FREE_Q} free done) - WAEC Standard</small><br><a class='btn red cbt-btn-fix' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}'>Unlock - Pay ₦{QUESTION_PRICE}</a></div>"
+                    btn = f"<div class='card cbt-btn-fix' style='border:2px solid #e94560'><b>{emoji} {s}</b><br><small>🔒 Pay to continue (10/{FREE_Q} free done)</small><br><a class='btn red cbt-btn-fix' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}'>Unlock - Pay ₦{QUESTION_PRICE}</a></div>"
                 else:
-                    btn = f"<a class='btn blue cbt-btn-fix' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}'><span>{emoji} {s}{waec_tag}</span><br><small>{done}/{min(limit,total_q)} done - {'WAEC' if 'SS3' in key else 'Graded'}</small></a>"
+                    btn = f"<a class='btn blue cbt-btn-fix' href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(s)}'><span>{emoji} {s}</span><br><small>{done}/{min(limit,total_q)} done</small></a>"
             sub_btns += btn
-    content = f"<div class='card'><h2>Subjects for {user['class']} {user.get('dept','')} - {'WAEC STANDARD' if 'SS3' in key else 'Graded'}</h2>{sub_btns}</div>"
+    content = f"<div class='card'><h2>Subjects for {user['class']} {user.get('dept','')}</h2>{sub_btns}</div>"
     return render_template_string(BASE, title="CBT", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
 @app.route('/cbt/<path:key>/<path:sub>', methods=["GET","POST"])
@@ -632,7 +491,7 @@ def cbt_exam(nickname, user, key, sub):
             return redirect(f"/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}")
         all_count = db.execute(sa.text("SELECT COUNT(*) FROM questions WHERE key=:k"), {"k": full_key}).scalar() or 0
         if all_count == 0:
-            return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>😕 No Questions Yet for {subj_emoji(sub)} {sub}</h2><p>Admin will upload 100 WAEC questions</p></div>"), timer_script="")
+            return render_template_string(BASE, title="Error", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>😕 No Questions Yet for {subj_emoji(sub)} {sub}</h2><p>Admin will upload 100 questions for this subject</p></div>"), timer_script="")
         prog = db.execute(sa.text("SELECT used FROM cbt_progress WHERE nickname=:u AND subject_key=:k"), {"u": nickname, "k": full_key}).scalar()
         if prog is None:
             db.execute(sa.text("INSERT INTO cbt_progress (nickname, subject_key, used) VALUES (:u, :k, 0) ON CONFLICT (nickname, subject_key) DO NOTHING"), {"u": nickname, "k": full_key})
@@ -645,28 +504,28 @@ def cbt_exam(nickname, user, key, sub):
             if pending:
                 content = "<div class=card><h2>⏳ Payment Under Review</h2><p>Admin verifying.</p></div>"
             else:
-                content = f'<div class=card><h2>🔒 Unlock 90 More WAEC for {subj_emoji(sub)} {sub}</h2><p>Total 100 Qs WAEC Standard: 10 free + 90 paid</p><p><b>Pay &#8358;{QUESTION_PRICE} for 30 days</b></p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account:</b><input class=readonly-box readonly value="{PALMPAY_ACCOUNT}"><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/questions><input name=bank_used placeholder="Bank you used" required><input name=account_name placeholder="Account Name" required><button class=btn>Submit</button></form><a class=btn blue href="/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1">🔄 Redo Free 10</a></div>'
+                content = f'<div class=card><h2>🔒 Unlock 90 More for {subj_emoji(sub)} {sub}</h2><p>Total 100 Qs: 10 free + 90 paid</p><p><b>Pay &#8358;{QUESTION_PRICE} for 30 days - Visible until expiry</b></p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account:</b><input class=readonly-box readonly value="{PALMPAY_ACCOUNT}"><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/questions><input name=bank_used placeholder="Bank you used" required><input name=account_name placeholder="Account Name" required><button class=btn>Submit</button></form><a class=btn blue href="/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1">🔄 Redo Free 10</a></div>'
             return render_template_string(BASE, title="Paywall", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
     start_index = prog
     end_index = min(start_index + BATCH_SIZE, total_limit, all_count)
     with DBSession() as db:
         batch_q = db.execute(sa.text(f"SELECT * FROM questions WHERE key=:k ORDER BY id ASC LIMIT :limit OFFSET :off"), {"k": full_key, "limit": end_index-start_index, "off": start_index}).mappings().all()
     questions = [dict(q) for q in batch_q]
-    for q in questions:
+    for q in questions: 
         try: q['options'] = json.loads(q['options'])
         except: q['options'] = []
     if not questions:
-        return render_template_string(BASE, title="Done", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>✅ Completed {sub} WAEC</h2><a class=btn href=/exam>Back to Subjects</a><a class=btn blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo</a></div>"), timer_script="")
-    time_per_q = 60 if sub in CALC_SUBJECTS else 45 if "SS3" in key else 30
+        return render_template_string(BASE, title="Done", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>✅ Completed {sub}</h2><a class=btn href=/exam>Back to Subjects</a><a class=btn blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo</a></div>"), timer_script="")
+    time_per_q = 60 if sub in CALC_SUBJECTS else 30
     batch_time = len(questions) * time_per_q
+    # Calculator show only for calc subjects
     calc_script = "document.getElementById('calcBtn').style.display='block';" if sub in CALC_SUBJECTS else "document.getElementById('calcBtn').style.display='none';"
     if request.method == "POST":
         score = 0; result_html = ""
         for i,q in enumerate(questions):
             user_ans = request.form.get(f"q{i}")
             if user_ans == q["ans"]: score += 1
-            display_ans = user_ans if user_ans else "Not Answered (Marked WRONG)"
-            result_html += f"<div class='card'><h4>Q{start_index + i + 1}: {q['q']}</h4><p><b>Your Answer:</b> {display_ans}</p><p><b>Correct:</b> {q['ans']}</p></div>"
+            result_html += f"<div class='card'><h4>Q{start_index + i + 1}: {q['q']}</h4><p><b>Your Answer:</b> {user_ans or 'Not Answered'}</p><p><b>Correct:</b> {q['ans']}</p></div>"
         total = len(questions); wrong = total - score
         new_done = prog + total
         with DBSession() as db:
@@ -674,38 +533,33 @@ def cbt_exam(nickname, user, key, sub):
             db.execute(sa.text("UPDATE users SET q_used=q_used+:t, correct=correct+:c, wrong=wrong+:w WHERE nickname=:u"), {"t": total, "c": score, "w": wrong, "u": nickname})
             db.commit()
         remaining = min(total_limit, all_count) - new_done
-        next_btn = f"<a class=btn href=/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}>Next 10 - {remaining} left - WAEC</a>" if remaining>0 else f"<a class=btn blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo {sub} WAEC</a>"
-        sound_js = "let ctx=new (window.AudioContext||window.webkitAudioContext)(); let notes=[523,659,784,1046]; notes.forEach((f,i)=>{let o=ctx.createOscillator(); o.frequency.value=f; o.connect(ctx.destination); o.start(ctx.currentTime+i*0.15); o.stop(ctx.currentTime+i*0.15+0.3);});" if score/total >=0.5 else "let ctx=new (window.AudioContext||window.webkitAudioContext)(); let o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=150; o.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.6);"
-        content = f"<div class='card'><h2>🎉 RESULT {subj_emoji(sub)} {sub} {'WAEC' if 'SS3' in key else ''}</h2><p><b>Score: {score}/{total}</b> - {'WAEC Standard' if 'SS3' in key else 'Graded'}</p><p>Completed: {new_done}/{min(total_limit,all_count)}</p></div>{result_html}{next_btn}<a class=btn blue href=/exam>Back to Subjects</a><script>setTimeout(()=>{{try{{{sound_js}}}catch(e){{}}}},500)</script>"
+        next_btn = f"<a class=btn href=/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}>Next 10 - {remaining} left</a>" if remaining>0 else f"<a class=btn blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo {sub}</a>"
+        if score/total >= 0.5:
+            sound_js = "let ctx=new (window.AudioContext||window.webkitAudioContext)(); let notes=[523,659,784,1046]; notes.forEach((f,i)=>{let o=ctx.createOscillator(); o.frequency.value=f; o.connect(ctx.destination); o.start(ctx.currentTime+i*0.15); o.stop(ctx.currentTime+i*0.15+0.3);});"
+        else:
+            sound_js = "let ctx=new (window.AudioContext||window.webkitAudioContext)(); let o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=150; o.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.6);"
+        content = f"<div class='card'><h2>🎉 RESULT {subj_emoji(sub)} {sub}</h2><p><b>Score: {score}/{total}</b></p><p>Completed: {new_done}/{min(total_limit,all_count)}</p></div>{result_html}{next_btn}<a class=btn blue href=/exam>Back to Subjects</a><script>setTimeout(()=>{{try{{{sound_js}}}catch(e){{}}}},500)</script>"
         return render_template_string(BASE, title="Result", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
     q_html = ""
     for i,q in enumerate(questions):
         options = "".join([f"<label class=option><input type=radio name=q{i} value=\"{opt}\" required><span>{opt}</span></label>" for opt in q["options"]])
-        q_html += f"<div class=card id=q{i}><p><b>Question {start_index + i + 1} {'WAEC' if 'SS3' in key else ''}</b></p><p>{q['q']}</p>{options}</div>"
+        q_html += f"<div class=card id=q{i}><p><b>Question {start_index + i + 1}</b></p><p>{q['q']}</p>{options}</div>"
     timer_js = Markup(f"""
     let timeLeft = {batch_time};
-    let timerInterval = null;
     const timerEl = document.createElement('div');
     timerEl.className = 'timer';
     document.querySelector('.container').prepend(timerEl);
     function updateTimer(){{
-        if(timeLeft < 0) timeLeft = 0;
         let m = Math.floor(timeLeft / 60); let s = timeLeft % 60; s = s < 10? '0' + s : s;
-        timerEl.innerHTML = '⏰ TIME LEFT: ' + m + ':' + s + ' | {subj_emoji(sub)} {sub} {'WAEC' if 'SS3' in key else ''} - {time_per_q}s per Q';
-        if(timeLeft <= 0){{
-            clearInterval(timerInterval);
-            timerEl.innerHTML = '⏰ TIME UP! Auto-submitting... Unanswered = WRONG';
-            document.getElementById('cbt_form').submit();
-            return;
-        }}
+        timerEl.innerHTML = '⏰ TIME LEFT: ' + m + ':' + s + ' | {subj_emoji(sub)} {sub} - {time_per_q}s per Q';
+        if(timeLeft <= 0){{ document.getElementById('cbt_form').submit(); }}
         timeLeft--;
     }}
-    updateTimer();
-    timerInterval = setInterval(updateTimer, 1000);
+    updateTimer(); setInterval(updateTimer, 1000);
     {calc_script}
     """)
-    content = f"<form method=POST id=cbt_form><h2 style='background:#0f3460;color:white;text-align:center;padding:10px;border-radius:8px'>{subj_emoji(sub)} {sub} {'WAEC STANDARD' if 'SS3' in key else ''} - Batch {math.floor(prog/BATCH_SIZE)+1}</h2><p style='text-align:center'>{time_per_q}s per Q WAEC (Total {batch_time//60}:{batch_time%60:02d})</p>{q_html}<button class='btn orange'>Submit WAEC</button></form>"
-    return render_template_string(BASE, title=f"{sub} WAEC", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
+    content = f"<form method=POST id=cbt_form><h2 style='background:#0f3460;color:white;text-align:center;padding:10px;border-radius:8px'>{subj_emoji(sub)} {sub} - Batch {math.floor(prog/BATCH_SIZE)+1}</h2><p style='text-align:center'>{time_per_q}s per question (Total {batch_time//60}:{batch_time%60:02d})</p>{q_html}<button class='btn orange'>Submit</button></form>"
+    return render_template_string(BASE, title=f"{sub}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
 
 @app.route('/confirm/<t>', methods=["POST"])
 @login_required
@@ -714,7 +568,8 @@ def confirm(nickname, user, t):
         db.execute(sa.text("INSERT INTO payments (nickname, name, type, status, bank_used, account_name, date_paid) VALUES (:u, :n, :t, 'Pending', :b, :a, :d)"),
         {"u": nickname, "n": user["name"], "t": t, "b": request.form["bank_used"], "a": request.form["account_name"], "d": str(date.today())});
         db.commit()
-    return render_template_string(BASE, title="Sent", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class='card'><h2>✅ Request Sent - WAEC Access</h2><p>Admin will verify within 24hrs</p></div>"), timer_script="")
+    return render_template_string(BASE, title="Sent", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class='card'><h2>✅ Request Sent</h2><p>Admin will verify within 24hrs</p></div>"), timer_script="")
+
 @app.route('/lessons')
 @login_required
 def lessons(nickname, user):
@@ -727,15 +582,17 @@ def lessons(nickname, user):
                     db.execute(sa.text("UPDATE users SET lesson_expiry=NULL WHERE nickname=:u"), {"u": nickname}); db.commit()
                     user['lesson_expiry']=None
             except: pass
+        # LESSON DIRECT - 1 lesson per subject
         if is_user_paid(user) or user.get('lesson_expiry'):
             all_lessons = db.execute(sa.text("SELECT * FROM lessons WHERE class=:c AND (dept=:d OR dept='' OR dept IS NULL) ORDER BY subject ASC"), {"c": user['class'], "d": user.get('dept','')}).mappings().all()
             if not all_lessons:
-                return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🎓 No lessons yet for {user['class']} {user.get('dept','')} - WAEC Standard loading...</h2></div>"), timer_script="")
+                return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🎓 No lessons yet for {user['class']} {user.get('dept','')}</h2><p>Admin will upload 1 lesson per subject directly</p></div>"), timer_script="")
+            # Group by subject - show 1 per subject
             by_subject = {}
             for l in all_lessons:
                 if l['subject'] not in by_subject:
                     by_subject[l['subject']] = l
-            html = f"<div class=card><h2>🎓 Lessons for {user['class']} {user.get('dept','')} - {len(by_subject)} Subjects - {'WAEC STANDARD' if 'SS3' in user['class'] else 'Graded'}</h2></div>"
+            html = f"<div class=card><h2>🎓 Lessons for {user['class']} {user.get('dept','')} - {len(by_subject)} Subjects</h2><p>1 lesson per subject as you requested</p></div>"
             for subj, l in by_subject.items():
                 media = ""
                 if l.get('media_link'):
@@ -745,13 +602,12 @@ def lessons(nickname, user):
                     else:
                         media = f"<img src='{link}' style='width:100%;border-radius:8px;max-height:300px'>"
                 d12 = format_12h(l['date'])
-                waec_badge = " <span style='background:gold;color:#0f3460;padding:2px 6px;border-radius:5px;font-size:0.7rem'>WAEC</span>" if "SS3" in l['class'] else ""
-                html += f"<div class=card style='border-left:5px solid #0f3460'><h3>{subj_emoji(l['subject'])} {l['subject']}{waec_badge}</h3><h4>{l['title']}</h4><p>{l['notes']}</p>{media}<small>📅 {d12}</small></div>"
+                html += f"<div class=card style='border-left:5px solid #0f3460'><h3>{subj_emoji(l['subject'])} {l['subject']}</h3><h4>{l['title']}</h4><p>{l['notes']}</p>{media}<small>📅 {d12}</small></div>"
             return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
         pending = db.execute(sa.text("SELECT * FROM payments WHERE nickname=:u AND type='lessons' AND status='Pending'"), {"u": nickname}).scalar()
         if pending:
-            return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>⏳ Payment Under Review - WAEC Lessons</h2></div>"), timer_script="")
-    return render_template_string(BASE, title="Pay Lesson", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🔒 Unlock WAEC Lessons - ₦{LESSON_PRICE}/30days</h2><p>WAEC Standard for SS3</p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Acct:</b><input class=readonly-box readonly value={PALMPAY_ACCOUNT}><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/lessons><input name=bank_used placeholder='Bank you used' required><input name=account_name placeholder='Account Name' required><button class=btn>Submit</button></form></div>"), timer_script="")
+            return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>⏳ Payment Under Review</h2><p>Admin will verify your lesson payment.</p></div>"), timer_script="")
+    return render_template_string(BASE, title="Pay Lesson", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🔒 Unlock Lessons - ₦{LESSON_PRICE}/30days</h2><p>1 lesson per subject - Uploaded directly from admin</p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Acct:</b><input class=readonly-box readonly value={PALMPAY_ACCOUNT}><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/lessons><input name=bank_used placeholder='Bank you used' required><input name=account_name placeholder='Account Name' required><button class=btn>Submit</button></form></div>"), timer_script="")
 
 @app.route('/daily', methods=["GET","POST"])
 @login_required
@@ -759,9 +615,11 @@ def daily_challenge_page(nickname, user):
     today = date.today()
     with DBSession() as db:
         db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname}); db.commit()
+        # Get today's 10 questions - Math, English, Civic only
         todays = db.execute(sa.text("SELECT * FROM daily_challenge WHERE day=:d ORDER BY id ASC LIMIT 10"), {"d": str(today)}).mappings().all()
+        # Leaderboard Top 10 today
         leaderboard = db.execute(sa.text("SELECT nickname, name, score FROM daily_scores WHERE day=:d ORDER BY score DESC, created_at ASC LIMIT 10"), {"d": str(today)}).mappings().all()
-        leader_html = "<div class=card style='border:2px solid gold'><h3>🏆 Leaderboard Today - Top 10 WAEC</h3>"
+        leader_html = "<div class=card style='border:2px solid gold'><h3>🏆 Leaderboard Today - Top 10</h3>"
         if not leaderboard:
             leader_html += "<p>No scores today yet. Be first!</p>"
         else:
@@ -770,28 +628,28 @@ def daily_challenge_page(nickname, user):
                 leader_html += f"<p>{medal} <b>{lb['name']} (@{lb['nickname']})</b> - {lb['score']}/10</p>"
         leader_html += "</div>"
         if not todays:
-            return render_template_string(BASE, title="Daily Challenge", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🏆 Daily Challenge FREE WAEC Mix</h2><p>10 WAEC Questions Per Day</p><p>😕 No challenge for today yet.</p></div>{leader_html}"), timer_script="")
+            return render_template_string(BASE, title="Daily Challenge", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🏆 Daily Challenge (FREE)</h2><p>Math, English, Civic - 10 Questions Per Day</p><p>😕 No challenge for today yet. Admin needs to upload 70 per week.</p></div>{leader_html}"), timer_script="")
         if request.method == "POST":
             score = 0
             for i, q in enumerate(todays):
                 ans = request.form.get(f"q{i}")
                 if ans == q['ans']: score += 1
+            # Save score - replace if exists today
             exists = db.execute(sa.text("SELECT id FROM daily_scores WHERE nickname=:u AND day=:d"), {"u": nickname, "d": str(today)}).scalar()
             if exists:
                 db.execute(sa.text("UPDATE daily_scores SET score=:s, created_at=NOW() WHERE nickname=:u AND day=:d"), {"s": score, "u": nickname, "d": str(today)})
             else:
                 db.execute(sa.text("INSERT INTO daily_scores (nickname, name, score, day) VALUES (:u, :n, :s, :d)"), {"u": nickname, "n": user['name'], "s": score, "d": str(today)})
             db.commit()
-            return render_template_string(BASE, title="Daily Result", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🎉 Daily WAEC Score: {score}/10</h2></div>{leader_html}"), timer_script="")
+            return render_template_string(BASE, title="Daily Result", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🎉 Daily Score: {score}/10</h2><p>Check leaderboard - you are ranked!</p><a class=btn href=/daily>Back to Leaderboard</a></div>{leader_html}"), timer_script="")
         q_html = ""
         for i, q in enumerate(todays):
             try: opts = json.loads(q['options'])
             except: opts = []
             options = "".join([f"<label class=option><input type=radio name=q{i} value=\"{opt}\" required><span>{opt}</span></label>" for opt in opts])
-            q_html += f"<div class=card><p><b>Q{i+1} [{q['subject']}] WAEC</b> {q['q']}</p>{options}</div>"
-        content = f"<div class=card><h2>🏆 Daily Challenge FREE WAEC - {today}</h2></div>{leader_html}<form method=POST>{q_html}<button class=btn orange>Submit Daily WAEC</button></form>"
+            q_html += f"<div class=card><p><b>Q{i+1} [{q['subject']}]</b> {q['q']}</p>{options}</div>"
+        content = f"<div class=card><h2>🏆 Daily Challenge FREE - {today}</h2><p>10 Questions (Mathematics, English, Civic)</p></div>{leader_html}<form method=POST>{q_html}<button class=btn orange>Submit Daily Challenge</button></form>"
         return render_template_string(BASE, title="Daily Challenge", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
-
 @app.route('/complain', methods=["GET","POST"])
 @login_required
 def complain_page(nickname, user):
@@ -800,12 +658,12 @@ def complain_page(nickname, user):
         if request.method=="POST" and request.form.get("text"):
             cnt = db.execute(sa.text("SELECT COUNT(*) FROM complaints WHERE nickname=:u AND created_at > NOW() - INTERVAL '7 days'"), {"u": nickname}).scalar() or 0
             if cnt >= 3:
-                return render_template_string(BASE, title="Complain Limit", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><div class=error>❌ 3 complains per week only.</div></div>"), timer_script="")
+                return render_template_string(BASE, title="Complain Limit", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><div class=error>❌ You don reach limit - 3 complains per week only.</div></div>"), timer_script="")
             db.execute(sa.text("INSERT INTO complaints (nickname, name, text) VALUES (:u,:n,:t)"), {"u": nickname, "n": user["name"], "t": request.form["text"][:700]})
             db.commit()
             return redirect("/complain")
         my = db.execute(sa.text("SELECT * FROM complaints WHERE nickname=:u ORDER BY id DESC LIMIT 20"), {"u": nickname}).mappings().all()
-    html = "<div class=card><h2>📩 Complain to Admin (3 per week)</h2><form method=POST><textarea name=text placeholder='Write complaint...' required maxlength=700></textarea><button class=btn>Send</button></form></div><h3>My Complaints</h3>"
+    html = "<div class=card><h2>📩 Complain to Admin (3 per week)</h2><form method=POST><textarea name=text placeholder='Write your complaint...' required maxlength=700></textarea><button class=btn>Send Complaint</button></form></div><h3>My Complaints</h3>"
     for c in my:
         ct12 = format_12h(str(c['created_at']))
         reply = f"<div style='background:#d4edda;padding:8px;margin-top:5px;border-radius:5px'><b>Admin Reply:</b> {c['reply']}</div>" if c['reply'] else "<small>⏳ Pending...</small>"
@@ -841,11 +699,11 @@ def community(nickname, user):
             bg_html += f"<div class='bg-option' data-bg=\"{safe_b}\" style='background:{b}' onclick=\"selectBg(this, '{b}')\"></div>"
     html = f"""<div class=card>
     <form method=POST id=communityForm>
-    <textarea name=text id=communityText placeholder='What is on your mind........ WAEC gist?' required maxlength=700 oninput="previewBg()"></textarea>
+    <textarea name=text id=communityText placeholder='What is on your mind........' required maxlength=700 oninput="previewBg()"></textarea>
     <input type=hidden name=bg id=selectedBg value=''>
     <div style='margin:8px 0'><small>🎨 Choose background:</small><br>{bg_html}</div>
     <div id=bgPreview style='display:none;margin:8px 0;border-radius:12px;padding:20px;text-align:center;color:white;font-weight:bold;min-height:60px;align-items:center;justify-content:center'></div>
-    <button class=btn>Post WAEC</button>
+    <button class=btn>Post</button>
     </form>
     <script>
     function selectBg(el, bg){{
@@ -872,13 +730,13 @@ def community(nickname, user):
         is_author = p['nickname']==nickname
         if is_motiz:
             style = "style='border:3px solid gold;background:linear-gradient(135deg,#fff8e1,#ffe082)'"
-            badge_html = " <span class=badge gold>✓ MOTIZ SUPPORT VERIFIED</span>"
+            badge_html = " <span class=badge gold>✓ MOTIZ SUPPORT VERIFIED</span> <span style=background:gold;padding:2px 5px;border-radius:5px;font-size:0.6rem;color:#0f3460;font-weight:bold;white-space:nowrap>ADMIN</span>"
         else:
             style = ""
             badge_html = ""
         bg_val = p.get('bg','') if isinstance(p, dict) else (p['bg'] if 'bg' in p else '')
         t12 = format_12h(str(p['created_at']))
-        del_btn = f"<a class=btn red href='/community?del_post={p['id']}' onclick=\"return confirm('Delete?')\" style='padding:6px;font-size:0.8rem;margin:5px 0;width:90%;max-width:280px'>🗑️ Delete</a>" if (is_author or nickname=='motiz_support') else ""
+        del_btn = f"<a class=btn red href='/community?del_post={p['id']}' onclick=\"return confirm('Delete this post?')\" style='padding:6px;font-size:0.8rem;margin:5px 0;width:90%;max-width:280px'>🗑️ Delete</a>" if (is_author or nickname=='motiz_support') else ""
         text_html = f"<div class='community-bg-post' style='background:{bg_val}'>{p['text']}</div>" if bg_val else f"<p>{p['text']}</p>"
         html+=f"<div class=card {style}><b>{p['name']}</b>{badge_html}<br><small>{t12}</small>{text_html}{del_btn}<div class=like-row><a class='btn gray' href='/like/{p['id']}' style='flex:1;padding:6px 8px;font-size:0.8rem;margin:0'>👍 Like ({len(likes)})</a><a class='btn gray' href='/post/{p['id']}' style='flex:1;padding:6px 8px;font-size:0.8rem;margin:0'>💬 Comment ({len(comments)})</a></div></div>"
     return render_template_string(BASE, title="Community", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
@@ -917,7 +775,7 @@ def post_detail(nickname, user, pid):
         for c in comments:
             ct12 = format_12h(c.get('time',''))
             html+=f"<div class=card><b>{c['name']}</b><p>{c['text']}</p><small>{ct12}</small></div>"
-        html+=f"<div class=card><form method=POST><textarea name=comment placeholder='Add comment WAEC' required></textarea><button class=btn>Comment</button></form></div>"
+        html+=f"<div class=card><form method=POST><textarea name=comment placeholder='Add comment' required></textarea><button class=btn>Comment</button></form></div>"
     return render_template_string(BASE, title="Post", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
 
 @app.route('/chat')
@@ -931,14 +789,14 @@ def chat(nickname, user):
         for f in friends:
             if f in blocked: continue
             if f == 'motiz_support':
-                friend_cards+=f"<a href=/dm/{f} class=friend-card style='border:3px solid gold;background:linear-gradient(135deg,#fff8e1,#ffe082)'><div class=friend-avatar style='background:gold;color:#0f3460'>✓</div><div><b>MOTIZ SUPPORT</b> <span class=badge style='background:gold;color:#0f3460;white-space:nowrap'>✓ VERIFIED</span><br><small>Official Support</small></div></a>"
+                friend_cards+=f"<a href=/dm/{f} class=friend-card style='border:3px solid gold;background:linear-gradient(135deg,#fff8e1,#ffe082)'><div class=friend-avatar style='background:gold;color:#0f3460'>✓</div><div><b>MOTIZ SUPPORT</b> <span class=badge style='background:gold;color:#0f3460;white-space:nowrap'>✓ VERIFIED SUPPORT</span><br><small>Official Support</small></div></a>"
                 continue
             u = db.execute(sa.text("SELECT name,last_seen FROM users WHERE nickname=:u"), {"u": f}).mappings().first()
             if u:
                 last = format_last_seen(u['last_seen']) if u.get('last_seen') else "Unknown"
                 unread = get_unread_per_friend(nickname, f)
-                bell = f" <span class='unread-badge-fix' style='background:red;color:white;padding:2px 6px;border-radius:10px;font-size:0.7rem;white-space:nowrap;display:inline-flex'>🔔{unread}</span>" if unread>0 else ""
-                friend_cards+=f"<a href=/dm/{f} class=friend-card><div class=friend-avatar>{f[0].upper()}</div><div><b>{u['name']}</b>{bell}<br><small>{last}</small></div></a>"
+                bell = f" <span style='background:red;color:white;padding:2px 6px;border-radius:10px;font-size:0.7rem'>🔔{unread}</span>" if unread>0 else ""
+                friend_cards+=f"<div class=friend-card><a href=/dm/{f} style='display:flex;align-items:center;gap:10px;flex:1;text-decoration:none;color:inherit'><div class=friend-avatar>{f[0].upper()}</div><div><b>{u['name']}</b>{bell}<br><small>{last}</small></div></a><a href=/unfriend/{f} class=btn red style='width:auto;padding:5px 8px;font-size:0.7rem;margin:0' onclick=\"return confirm('Unfriend {f}?')\">Unfriend</a><a href=/block/{f} class=btn gray style='width:auto;padding:5px 8px;font-size:0.7rem;margin:0' onclick=\"return confirm('Block {f}? They cannot message you again')\">Block</a></div>"
         groups = db.execute(sa.text("SELECT * FROM groups")).mappings().all()
         group_html = ""
         for g in groups:
@@ -946,7 +804,7 @@ def chat(nickname, user):
             except: members=[]
             if nickname in members:
                 group_html+=f"<a href=/group/{g['id']} class=friend-card><div class=friend-avatar>👥</div><div><b>{g['name']}</b><br><small>{len(members)} members</small></div></a>"
-    content = f"<h3>Friends ({len([x for x in friends if x!='motiz_support' and x not in blocked])})</h3>{friend_cards or '<div class=card><p>No friends yet</p><a class=btn blue href=/me>👤 Go to Me</a></div>'}<h3>Groups</h3>{group_html or '<p>No groups</p>'}<a class=btn blue href=/create_group>➕ Create Group</a>"
+    content = f"<h3>Friends ({len([x for x in friends if x!='motiz_support' and x not in blocked])})</h3>{friend_cards or '<div class=card><p>No friends yet</p><a class=btn blue href=/me>👤 Go to Me to Add Friends</a></div>'}<h3>Groups</h3>{group_html or '<p>No groups</p>'}<a class=btn blue href=/create_group>➕ Create Group</a>"
     return render_template_string(BASE, title="Chat", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
 @app.route('/block/<f>')
@@ -962,6 +820,7 @@ def block_friend(nickname, user, f):
         if f in friends: friends.remove(f)
         if f not in blocked: blocked.append(f)
         db.execute(sa.text("UPDATE users SET friends=:f, blocked=:b WHERE nickname=:u"), {"f": json.dumps(friends), "b": json.dumps(blocked), "u": nickname})
+        # Remove from other user's friends too
         other = db.execute(sa.text("SELECT friends FROM users WHERE nickname=:u"), {"u": f}).mappings().first()
         if other:
             try: of = json.loads(other['friends'] or '[]')
@@ -999,7 +858,7 @@ def me_page(nickname, user):
         reqs = db.execute(sa.text("SELECT * FROM friend_requests WHERE to_nickname=:u AND status='Pending'"), {"u": nickname}).mappings().all()
         req_html = ""
         for r in reqs:
-            req_html+=f"<div class=card><b>{r['from_nickname']}</b> sent request<br><div style='display:flex;gap:8px;justify-content:center'><a class=btn blue href=/accept/{r['from_nickname']} style='width:44%;max-width:160px'>✅ Accept</a><a class=btn red href=/reject/{r['from_nickname']} style='width:44%;max-width:160px'>❌ Reject</a></div></div>"
+            req_html+=f"<div class=card><b>{r['from_nickname']}</b> sent you friend request<br><div style='display:flex;gap:8px;justify-content:center'><a class=btn blue href=/accept/{r['from_nickname']} style='width:44%;max-width:160px'>✅ Accept</a><a class=btn red href=/reject/{r['from_nickname']} style='width:44%;max-width:160px'>❌ Reject</a></div></div>"
         all_users = db.execute(sa.text("SELECT nickname, name, class, is_verified FROM users WHERE nickname!=:u AND nickname!='motiz_support' ORDER BY RANDOM()"), {"u": nickname}).mappings().all()
         friends = user.get('friends', [])
         blocked = user.get('blocked', [])
@@ -1007,14 +866,14 @@ def me_page(nickname, user):
         filtered = [u for u in all_users if u['nickname'] not in friends and u['nickname'] not in blocked and u['nickname'] not in pending_to]
         batch = filtered[offset:offset+FRIENDS_BATCH]
         is_verified_badge = " <span class=badge style='background:#28a745;white-space:nowrap'>✓ Verified Paid</span>" if is_user_paid(user) else ""
-        html = f"{req_html}<div class=card style='border:2px solid #28a745'><h2>{user['name']}{is_verified_badge} - {subj_emoji(user['class'])}</h2><p><b>Nickname:</b> {nickname}</p><p><b>Class:</b> {user['class']} {user.get('dept','')} - {'WAEC STANDARD' if 'SS3' in user['class'] else 'Graded'}</p><p><b>Referral Link:</b><input class=readonly-box readonly value='{BASE_URL}/register?ref={nickname}'></p><p><b>Bonus:</b> 5 days free per paid referral</p></div><h3>🔍 Add Friends (5)</h3>"
+        html = f"{req_html}<div class=card style='border:2px solid #28a745'><h2>{user['name']}{is_verified_badge} - {subj_emoji(user['class'])}</h2><p><b>Nickname:</b> {nickname}</p><p><b>Class:</b> {user['class']} {user.get('dept','')}</p><p><b>Referral Link:</b><input class=readonly-box readonly value='{BASE_URL}/register?ref={nickname}'></p><p><b>Referral Bonus:</b> 5 days free per paid referral</p><p><b>Blocked Users:</b> {len(blocked)}</p></div><h3>🔍 Add Friends (Scout 5)</h3>"
         for u in batch:
             html+=f"<div class=friend-card><div class=friend-avatar>{u['nickname'][0].upper()}</div><div style='flex:1'><b>{u['name']}</b><br><small>{u['nickname']} - {u['class']}</small></div><a class=btn blue href=/add_friend/{u['nickname']}?offset={offset} style='width:auto;padding:8px 15px;max-width:80px'>Add</a></div>"
         next_offset = offset + FRIENDS_BATCH
         if next_offset < len(filtered):
-            html+=f"<a class='btn orange' href=/me?offset={next_offset}>🔍 Scout Next 5</a>"
+            html+=f"<a class='btn orange' href=/me?offset={next_offset}>🔍 Scout - Show Next 5</a>"
         else:
-            html+=f"<a class=btn gray href=/me?offset=0>🔄 Scout Again</a>"
+            html+=f"<a class=btn gray href=/me?offset=0>🔄 Scout Again From Start</a>"
         html+=f"<a class=btn red href=/logout style='margin-top:20px'>🚪 Logout</a>"
     return render_template_string(BASE, title="Me", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
 
@@ -1063,14 +922,15 @@ def add_friend(nickname, user, f):
 @login_required
 def dm_page(nickname, user, other):
     with DBSession() as db:
+        # BLOCK CHECK - NEW
         if other in user.get('blocked', []):
-            return render_template_string(BASE, title="Blocked", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🚫 You blocked {other}</h2></div>"), timer_script="")
+            return render_template_string(BASE, title="Blocked", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🚫 You blocked {other}</h2><p>Unblock from chat page to message again</p><a class=btn href=/chat>Back to Chat</a></div>"), timer_script="")
         other_user = db.execute(sa.text("SELECT * FROM users WHERE nickname=:o"), {"o": other}).mappings().first()
         if not other_user: return redirect("/chat")
         try: other_blocked = json.loads(other_user.get('blocked','[]') or '[]')
         except: other_blocked = []
         if nickname in other_blocked:
-            return render_template_string(BASE, title="Blocked", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🚫 {other} blocked you</h2></div>"), timer_script="")
+            return render_template_string(BASE, title="Blocked", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🚫 {other} blocked you</h2><p>You cannot send message to this user</p><a class=btn href=/chat>Back to Chat</a></div>"), timer_script="")
         db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname}); db.commit()
         del_id = request.args.get('del_msg')
         if del_id:
@@ -1099,6 +959,7 @@ def dm_page(nickname, user, other):
             db.commit()
             return redirect(f"/dm/{other}")
         dms = db.execute(sa.text("SELECT * FROM dms WHERE (from_nickname=:u AND to_nickname=:o) OR (from_nickname=:o AND to_nickname=:u) ORDER BY id ASC"), {"u": nickname, "o": other}).mappings().all()
+
     chat_html = ""
     for m in dms:
         is_me = m['from_nickname']==nickname
@@ -1124,6 +985,7 @@ def dm_page(nickname, user, other):
         safe_text = m['text'][:80].replace("'","").replace('"',"").replace("\n"," ")
         chat_html+=f"""<div class='chat-msg {cls}' oncontextmenu="showMenu(event,{m['id']},'{safe_text}'); return false;" onclick="showMenu(event,{m['id']},'{safe_text}')">
         <div class='bubble {cls}' id='msg-{m['id']}'><div class='bubble-text'>{text_display}</div><div class='bubble-time'>{t12} {tick}</div></div></div>"""
+
     timer_js = Markup(f"""
     setTimeout(()=>{{ window.scrollTo(0, document.body.scrollHeight); }}, 300);
     let exitBtn = document.querySelector('.exit-btn');
@@ -1131,7 +993,9 @@ def dm_page(nickname, user, other):
     let lastCount = {len(dms)};
     setInterval(()=>{{
         fetch('/check_dm/{other}').then(r=>r.json()).then(data=>{{
-            if(data.count > lastCount){{ location.reload(); }}
+            if(data.count > lastCount){{
+                location.reload();
+            }}
         }});
     }}, 3000);
     let replyText = '';
@@ -1149,12 +1013,16 @@ def dm_page(nickname, user, other):
     }}
     function doReply(id, text){{ document.getElementById('replyPreview').style.display='flex'; document.getElementById('replyPreviewText').innerText=text.substring(0,50); document.getElementById('replyToInput').value=text; document.getElementById('msgMenu').style.display='none'; }}
     function doCopy(text){{ navigator.clipboard.writeText(text); document.getElementById('msgMenu').style.display='none'; }}
-    function doDelete(id){{ if(confirm('Delete?')){{ window.location.href='/dm/{other}?del_msg='+id; }} }}
+    function doDelete(id){{ if(confirm('Delete this message?')){{ window.location.href='/dm/{other}?del_msg='+id; }} }}
     function cancelReply(){{ document.getElementById('replyPreview').style.display='none'; document.getElementById('replyToInput').value=''; }}
     document.addEventListener('click', function(e){{ if(!e.target.closest('#msgMenu') &&!e.target.closest('.bubble')){{ let m=document.getElementById('msgMenu'); if(m) m.style.display='none'; }} }});
     """)
-    verified_badge = " <span class=badge style='background:gold;color:#0f3460;white-space:nowrap'>✓ VERIFIED SUPPORT</span>" if other == 'motiz_support' else ""
-    content = f"<div class=dm-actions-top><a href=/block/{other} style='background:#e94560'>🚫 Block</a><a href=/unfriend/{other} style='background:#555'>👋 Unfriend</a></div><h3>💬 {other_user['name']}{verified_badge} ({format_last_seen(other_user.get('last_seen'))})</h3><div id=chatBox>{chat_html or '<div class=card><p>💬 No messages yet</p></div>'}</div><form method=POST class=chat-input-fixed><div id=replyPreview class=reply-preview style='display:none'><span id=replyPreviewText></span><button type=button onclick='cancelReply()' style='background:red;color:white;border:none;border-radius:50%;width:20px'>X</button></div><input type=hidden name=reply_to id=replyToInput><div style='display:flex;gap:5px'><input name=text id=chatInput placeholder='Type...' required maxlength=700 style='flex:1'><button class=send-img-btn><img src={SEND_BTN_URL}></button></div></form><div id=msgMenu style='display:none'></div>"
+
+    verified_badge = ""
+    if other == 'motiz_support':
+        verified_badge = " <span class=badge style='background:gold;color:#0f3460;white-space:nowrap'>✓ VERIFIED SUPPORT</span>"
+
+    content = f"<h3>💬 {other_user['name']}{verified_badge} ({format_last_seen(other_user.get('last_seen'))})</h3><div id=chatBox>{chat_html}</div><form method=POST class=chat-input-fixed><div id=replyPreview class=reply-preview style='display:none'><span id=replyPreviewText></span><button type=button onclick='cancelReply()' style='background:red;color:white;border:none;border-radius:50%;width:20px'>X</button></div><input type=hidden name=reply_to id=replyToInput><div style='display:flex;gap:5px'><input name=text id=chatInput placeholder='Type message... (max 700)' required autocomplete=off maxlength=700 style='flex:1'><button class=send-img-btn><img src={SEND_BTN_URL}></button></div></form><div id=msgMenu style='display:none'></div><div style='text-align:center;margin-top:80px'><a href=/block/{other} class=btn red style='width:45%;display:inline-block' onclick=\"return confirm('Block {other}?')\">🚫 Block</a><a href=/unfriend/{other} class=btn gray style='width:45%;display:inline-block' onclick=\"return confirm('Unfriend {other}?')\">👋 Unfriend</a></div>"
     return render_template_string(BASE, title=f"Chat {other}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
 
 @app.route('/check_dm/<other>')
@@ -1166,218 +1034,335 @@ def check_dm(nickname, user, other):
 @app.route('/create_group', methods=["GET","POST"])
 @login_required
 def create_group(nickname, user):
-    with DBSession() as db:
-        db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname}); db.commit()
-        if request.method=="POST" and request.form.get("name"):
-            db.execute(sa.text("INSERT INTO groups (name, creator, members) VALUES (:n,:c,:m)"), {"n": request.form["name"][:50], "c": nickname, "m": json.dumps([nickname])})
-            db.commit(); return redirect("/chat")
-    return render_template_string(BASE, title="Create Group", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>👥 Create WAEC Group</h2><form method=POST><input name=name placeholder='Group Name e.g SS3 WAEC Science' required><button class=btn>Create</button></form></div>"), timer_script="")
+    if request.method=="POST":
+        name = request.form.get("name","").strip()[:50]
+        if name:
+            with DBSession() as db:
+                db.execute(sa.text("INSERT INTO groups (name, creator, members) VALUES (:n,:c,:m)"), {"n": name, "c": nickname, "m": json.dumps([nickname])})
+                db.commit()
+            return redirect("/chat")
+    return render_template_string(BASE, title="Create Group", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>Create Group</h2><form method=POST><input name=name placeholder='Group Name' required maxlength=50><button class=btn>Create Group</button></form></div>"), timer_script="")
 
 @app.route('/group/<int:gid>', methods=["GET","POST"])
 @login_required
-def group_chat(nickname, user, gid):
+def group_page(nickname, user, gid):
     with DBSession() as db:
         g = db.execute(sa.text("SELECT * FROM groups WHERE id=:i"), {"i": gid}).mappings().first()
         if not g: return redirect("/chat")
         try: members=json.loads(g['members'] or '[]')
         except: members=[]
         if nickname not in members: return redirect("/chat")
+        if request.args.get('add_member'):
+            new_member = request.args.get('add_member')
+            if new_member!= 'motiz_support' and new_member not in members:
+                members.append(new_member)
+                db.execute(sa.text("UPDATE groups SET members=:m WHERE id=:i"), {"m": json.dumps(members), "i": gid}); db.commit()
+            return redirect(f"/group/{gid}")
+        if request.args.get('remove_member') and g['creator']==nickname:
+            rem = request.args.get('remove_member')
+            if rem in members and rem!= nickname and rem!= 'motiz_support':
+                members.remove(rem)
+                db.execute(sa.text("UPDATE groups SET members=:m WHERE id=:i"), {"m": json.dumps(members), "i": gid}); db.commit()
+            return redirect(f"/group/{gid}")
         if request.method=="POST" and request.form.get("text"):
             try: msgs=json.loads(g['messages'] or '[]')
             except: msgs=[]
-            msgs.append({"user": nickname, "name": user["name"], "text": request.form["text"][:700], "time": str(datetime.now(NIGERIA_TZ))})
+            msgs.append({"from": nickname, "name": user['name'], "text": request.form["text"][:700], "time": str(datetime.now(NIGERIA_TZ))})
             db.execute(sa.text("UPDATE groups SET messages=:m WHERE id=:i"), {"m": json.dumps(msgs), "i": gid}); db.commit()
             return redirect(f"/group/{gid}")
         try: msgs=json.loads(g['messages'] or '[]')
         except: msgs=[]
-        chat_html=""
-        for m in msgs:
-            chat_html+=f"<div class=card><b>{m['name']}</b><p>{m['text']}</p><small>{format_12h(m.get('time',''))}</small></div>"
-        return render_template_string(BASE, title=g['name'], header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<h2>{g['name']} WAEC Group</h2>{chat_html}<form method=POST class=chat-input-fixed><div style='display:flex;gap:5px'><input name=text placeholder='Message WAEC group...' required style='flex:1'><button class=send-img-btn><img src={SEND_BTN_URL}></button></div></form>"), timer_script="")
+        friends_to_add = [f for f in user.get('friends', []) if f not in members and f!= 'motiz_support']
+        friends_options = "".join([f"<a class=btn blue href=/group/{gid}?add_member={f} style='margin:3px;width:auto;padding:6px 10px;font-size:0.8rem;display:inline-block;max-width:120px'>➕ Add {f}</a>" for f in friends_to_add])
+    html = f"<div class=card><h3>👥 {g['name']}</h3><p>Creator: {g['creator']} | Members: {len(members)} <small>(hidden for privacy)</small></p></div>"
+    if friends_to_add:
+        html+=f"<div class=card><h4>Add Members (Friends only):</h4>{friends_options}</div>"
+    for m in msgs:
+        is_me = m['from']==nickname
+        cls = "me" if is_me else "other"
+        t12 = format_12h(m.get('time',''))
+        html+=f"<div class='chat-msg {cls}'><div class='bubble {cls}'><b>{m['name']}</b><br>{m['text']}<div class='bubble-time'>{t12}</div></div></div>"
+    html+=f"<form method=POST class=chat-input-fixed><input name=text placeholder='Type message... (max 700)' required maxlength=700><button class=send-img-btn><img src={SEND_BTN_URL}></button></form>"
+    timer_js = Markup("""
+    let exitBtn = document.querySelector('.exit-btn');
+    if(exitBtn) exitBtn.setAttribute('onclick', "location.replace('/chat')");
+    """)
+    return render_template_string(BASE, title=g['name'], header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script=timer_js)
 
-@app.route('/admin/<password>')
-def admin_dashboard(password):
-    if password!= ADMIN_PASS: return "❌ Wrong Admin Password"
+def check_admin_level(level):
+    return session.get(f"admin_{level}_logged_in") or session.get("admin_logged_in")
+
+@app.route('/admin/<level>', methods=["GET","POST"])
+def admin_level(level):
+    global ADMIN_PASS
+    if level not in ADMIN_LEVELS and level!= "super":
+        return redirect("/admin")
+    if not check_admin_level(level):
+        error = ""
+        if request.method=="POST" and "login_pass" in request.form:
+            if request.form.get("login_pass")== ADMIN_PASS or request.form.get("login_pass")== f"{ADMIN_PASS}_{level}":
+                session[f"admin_{level}_logged_in"] = True
+                return redirect(f"/admin/{level}")
+            else: error = "<div class=error>Wrong Password for "+level+"</div>"
+        return render_template_string(BASE, title=f"Admin {level.upper()}", header="", content=Markup(f"<div class='card'><h2>🔒 {level.upper()} Admin Login</h2><p>Use main pass or {level} pass</p>{error}<form method=POST><input type=password name=login_pass placeholder='Enter {level} Admin Password' required><button class=btn>Login</button></form></div>"), timer_script="")
+    return redirect(f"/admin?level={level}")
+
+@app.route('/admin', methods=["GET","POST"])
+@login_required
+def admin(nickname, user):
+    global ADMIN_PASS, NOTICES, PINNED_NOTICE
+    level_filter = request.args.get('level')
+    allowed_keys = None
+    if level_filter and level_filter in ADMIN_LEVELS:
+        if not check_admin_level(level_filter) and not session.get("admin_logged_in"):
+            return redirect(f"/admin/{level_filter}")
+        allowed_keys = ADMIN_LEVELS[level_filter]
+    elif not session.get("admin_logged_in"):
+        error = ""
+        if request.method=="POST" and "login_pass" in request.form:
+            if request.form.get("login_pass")== ADMIN_PASS: session["admin_logged_in"] = True; return redirect("/admin")
+            else: error = "<div class=error>Wrong Password</div>"
+        return render_template_string(BASE, title="Admin", header="", content=Markup(f"<div class='card'><h2>🔒 Super Admin Login</h2>{error}<form method=POST><input type=password name=login_pass placeholder='Enter Admin Password' required><button class=btn>Login</button></form><p><a href=/admin/jss1>JSS1 Admin</a> | <a href=/admin/jss2>JSS2</a> | <a href=/admin/jss3>JSS3</a> | <a href=/admin/sss1>SS1 Admin</a> | <a href=/admin/sss2>SS2 Admin</a> | <a href=/admin/sss3>SS3 Admin</a></p></div>"), timer_script="")
+    error = ""; bulk_result = ""
+    q_target = request.args.get('q_target')
+    l_target = request.args.get('l_target')
+    manage = request.args.get('manage')
+    edit_notice_id = request.args.get('edit_notice')
     with DBSession() as db:
-        pending_payments = db.execute(sa.text("SELECT * FROM payments WHERE status='Pending' ORDER BY id DESC")).mappings().all()
-        all_users = db.execute(sa.text("SELECT * FROM users ORDER BY id DESC LIMIT 100")).mappings().all()
-        complaints = db.execute(sa.text("SELECT * FROM complaints WHERE status='Pending' ORDER BY id DESC")).mappings().all()
-        notices = db.execute(sa.text("SELECT * FROM notices ORDER BY created_at DESC LIMIT 10")).mappings().all()
-        today = str(date.today())
-        daily_q = db.execute(sa.text("SELECT COUNT(*) FROM daily_challenge WHERE day=:d"), {"d": today}).scalar() or 0
-        html = f"<div class=card><h2>🔑 MOTIZ ADMIN - WAEC STANDARD</h2><p>Daily WAEC Qs today: {daily_q}/10</p></div>"
-        html += "<div class=card><h3>💰 Pending Payments</h3>"
-        for p in pending_payments:
-            html += f"<div class=card style='border:1px solid orange'><b>{p['name']} @{p['nickname']}</b> - {p['type']} - {p['bank_used']} {p['account_name']}<br><small>{p['date_paid']}</small><br><div style='display:flex;gap:5px'><a class=btn blue href=/admin/{password}/approve/{p['id']}>✅ Approve</a><a class=btn red href=/admin/{password}/reject/{p['id']}>❌ Reject</a></div></div>"
-        if not pending_payments: html += "<p>No pending</p>"
-        html += "</div><div class=card><h3>📩 Complaints</h3>"
-        for c in complaints:
-            html += f"<div class=card><b>{c['name']} @{c['nickname']}</b>: {c['text']}<br><form method=POST action=/admin/{password}/reply/{c['id']}><textarea name=reply placeholder='Reply...' required></textarea><button class=btn>Reply & Resolve</button></form></div>"
-        if not complaints: html += "<p>No complaints</p>"
-        html += f"</div><div class=card><h3>📢 Upload Notice + Set Daily WAEC Challenge (FREE)</h3><form method=POST action=/admin/{password}/notice><input name=title placeholder='Notice Title' required><textarea name=text placeholder='Notice text' required></textarea><input name=media_link placeholder='Optional Image/Video Link (https://)'><button class=btn>Upload Notice</button></form><hr><h4>🏆 Set Today's 10 WAEC Daily Challenge (Auto WAEC Mix)</h4><form method=POST action=/admin/{password}/set_daily><input name=day type=date value={today} required><button class=btn orange>Auto-Generate 10 WAEC Daily Challenge</button></form><p><small>Will pick 10 random from SS3 WAEC bank mix</small></p><h4>📌 Pin Notice</h4><form method=POST action=/admin/{password}/pin_notice><input name=title placeholder='Pinned Title' required><textarea name=text placeholder='Pinned text' required></textarea><button class=btn>Pin Notice</button></form><form method=POST action=/admin/{password}/unpin_notice><button class=btn gray>Unpin Notice</button></form></div>"
-        html += "<div class=card><h3>📚 Upload WAEC Lesson</h3><form method=POST action=/admin/{}/upload_lesson><select name=class required><option value=''>Select Class</option>".format(password)
-        for c in CLASSES: html+=f"<option>{c}</option>"
-        html += "</select><input name=dept placeholder='Dept e.g Science (leave blank for JSS)'><select name=subject required><option value=''>Select Subject</option>"
-        all_subjs = set(sum([v for v in SUBJECTS.values()], []))
-        for s in sorted(all_subjs): html+=f"<option>{s}</option>"
-        html += f"</select><input name=title placeholder='Lesson Title e.g WAEC Past Q 2022' required><textarea name=notes placeholder='Lesson Notes WAEC Standard' required></textarea><input name=media_link placeholder='Media Link'><button class=btn>Upload WAEC Lesson</button></form></div>"
-        html += f"<div class=card><h3>📤 Upload WAEC Questions CSV</h3><p>CSV columns: key, q, option1, option2, option3, option4, ans<br>Key example: SS3_Science_Physics (Must match WAEC bank)</p><form method=POST action=/admin/{password}/upload_csv enctype=multipart/form-data><input type=file name=csv_file accept=.csv required><button class=btn>Upload WAEC CSV</button></form><a class=btn blue href=/admin/{password}/export_csv>📥 Export All Questions CSV</a><a class=btn orange href=/admin/{password}/reset_progress>🔄 Reset ALL User Progress (Redo)</a></div>"
-        html += "<div class=card><h3>👥 Users (100 latest) - Referral & Scores</h3><table style='width:100%;font-size:0.8rem'><tr><th>Nick</th><th>Name</th><th>Class</th><th>Correct/Wrong</th><th>Verified</th></tr>"
-        for u in all_users:
-            html += f"<tr><td>@{u['nickname']}</td><td>{u['name']}</td><td>{u['class']}</td><td>{u['correct']}/{u['wrong']}</td><td>{'✅' if u['is_verified'] else '❌'}</td></tr>"
-        html += "</table></div>"
-    return render_template_string(BASE, title="Admin WAEC", header=Markup(""), content=Markup(html), timer_script="")
+        pending_reqs = db.execute(sa.text("SELECT * FROM payments WHERE status='Pending' ORDER BY id DESC")).mappings().all()
+        complaints_pending = db.execute(sa.text("SELECT * FROM complaints ORDER BY id DESC LIMIT 50")).mappings().all()
+        complaints_count = db.execute(sa.text("SELECT COUNT(*) FROM complaints WHERE status='Pending'")).scalar() or 0
+    if request.method=="POST":
+        with DBSession() as db:
+            try:
+                if "verify_id" in request.form:
+                    req = db.execute(sa.text("SELECT * FROM payments WHERE id=:id"), {"id": request.form["verify_id"]}).mappings().first()
+                    if req:
+                        if req["type"] == "questions":
+                            db.execute(sa.text("UPDATE users SET q_cycle='paid', is_verified=TRUE, payment_verified_date=:today WHERE nickname=:u"), {"today": str(date.today()), "u": req["nickname"]})
+                        if req["type"] == "lessons":
+                            db.execute(sa.text("UPDATE users SET lesson_expiry=:d, is_verified=TRUE, payment_verified_date=:today WHERE nickname=:u"), {"d": str(date.today() + timedelta(days=30)), "today": str(date.today()), "u": req["nickname"]})
+                        ref = db.execute(sa.text("SELECT referred_by FROM users WHERE nickname=:u"), {"u": req["nickname"]}).scalar()
+                        if ref:
+                            ref_user = db.execute(sa.text("SELECT lesson_expiry FROM users WHERE nickname=:r"), {"r": ref}).scalar()
+                            try:
+                                if ref_user:
+                                    current_expiry = datetime.strptime(str(ref_user), "%Y-%m-%d").date()
+                                    if current_expiry < date.today(): current_expiry = date.today()
+                                else: current_expiry = date.today()
+                                new_expiry = current_expiry + timedelta(days=5)
+                            except: new_expiry = date.today() + timedelta(days=5)
+                            db.execute(sa.text("UPDATE users SET lesson_expiry=:d, free_days=free_days+5, referral_count=referral_count+1 WHERE nickname=:r"), {"d": str(new_expiry), "r": ref})
+                        db.execute(sa.text("UPDATE payments SET status='Verified' WHERE id=:id"), {"id": request.form["verify_id"]})
+                        db.commit(); error = "<div class=success>✅ Verified - 30 Days + 5 Days Referral</div>"
+                if "deny_id" in request.form:
+                    db.execute(sa.text("UPDATE payments SET status='Denied' WHERE id=:id"), {"id": request.form["deny_id"]}); db.commit(); error = "<div class=error>Payment Denied</div>"
+                if "reply_complaint" in request.form:
+                    db.execute(sa.text("UPDATE complaints SET reply=:r, status='Replied' WHERE id=:i"), {"r": request.form["reply_text"], "i": int(request.form["complaint_id"])}); db.commit(); error = "<div class=success>Complaint Replied</div>"
+                if "delete_complaint" in request.form:
+                    db.execute(sa.text("DELETE FROM complaints WHERE id=:i"), {"i": int(request.form["complaint_id"])}); db.commit(); error = "<div class=error>Complaint Deleted</div>"
+                if "add_question" in request.form:
+                    key = f"{request.form['q_key']}_{request.form['admin_subject']}"
+                    if allowed_keys and not any(k in key for k in allowed_keys):
+                        error = f"<div class=error>Not allowed for {level_filter} admin</div>"
+                    else:
+                        options = [request.form["a"],request.form["b"],request.form["c"],request.form["d"]]
+                        correct_ans = options[int(request.form["correct_ans"])]
+                        db.execute(sa.text("INSERT INTO questions (key, q, options, ans) VALUES (:k, :q, :o, :a)"),{"k": key, "q": request.form["q"], "o": json.dumps(options), "a": correct_ans}); db.commit(); error = f"<div class=success>Question Added for {key} - Full answer: {correct_ans}</div>"
+                if "bulk_upload" in request.form:
+                    key = f"{request.form['bulk_key']}_{request.form['bulk_subject']}"
+                    if allowed_keys and not any(k in key for k in allowed_keys):
+                        error = f"<div class=error>Not allowed for {level_filter} admin</div>"
+                    else:
+                        db.execute(sa.text("DELETE FROM questions WHERE key=:k"), {"k": key})
+                        db.commit()
+                        data = request.form['bulk_data'].strip()
+                        f_io = StringIO(data)
+                        reader = csv.reader(f_io)
+                        success = 0; failed = []
+                        for i, parts in enumerate(reader, 1):
+                            try:
+                                if len(parts)!= 6: raise Exception("Need 6 cols: Q,A,B,C,D,FullCorrectAnswer")
+                                q, a, b, c, d, ans = [x.strip() for x in parts]
+                                options = [a,b,c,d]
+                                if ans not in options:
+                                    raise Exception(f"Correct ans '{ans}' must be exactly one of A-D options")
+                                db.execute(sa.text("INSERT INTO questions (key, q, options, ans) VALUES (:k, :q, :o, :a)"),{"k": key, "q": q, "o": json.dumps(options), "a": ans})
+                                success += 1
+                            except Exception as e: failed.append(f"Line {i}: {str(e)}")
+                        db.commit()
+                        bulk_result = f"<div class=success>✅ Monthly Rotation Done - Old deleted, {success} New Added for {key} (100 Qs total = 10 free + 90 paid, visible until expiry)</div>"
+                        if failed: bulk_result += f"<div class=error>❌ {' | '.join(failed[:5])}</div>"
+                if "bulk_daily" in request.form:
+                    day_str = request.form['daily_day']
+                    data = request.form['daily_data'].strip()
+                    db.execute(sa.text("DELETE FROM daily_challenge WHERE day=:d"), {"d": day_str})
+                    db.commit()
+                    f_io = StringIO(data)
+                    reader = csv.reader(f_io)
+                    success = 0
+                    for parts in reader:
+                        try:
+                            if len(parts) < 6: continue
+                            # FIXED: Support both 6 cols (Subject,Q,A,B,C,D where D is also ans) and 7 cols (Subject,Q,A,B,C,D,Ans)
+                            if len(parts) == 7:
+                                subj,q,a,b,c,d,ans = [x.strip() for x in parts]
+                            else:
+                                subj,q,a,b,c,d = [x.strip() for x in parts[:6]]
+                                ans = d # if only 6 cols, last is ans, assume D is correct for backward compat - better require 7
+                                # Actually expect 7, so if 6, treat as missing ans -> use last
+                            options = [a,b,c,d]
+                            db.execute(sa.text("INSERT INTO daily_challenge (day, subject, q, options, ans) VALUES (:d, :s, :q, :o, :a)"), {"d": day_str, "s": subj, "q": q, "o": json.dumps(options), "a": ans})
+                            success+=1
+                        except: pass
+                    db.commit()
+                    bulk_result = f"<div class=success>✅ {success} Daily Challenges added for {day_str} - 70/week works now</div>"
+                if "add_lesson" in request.form:
+                    parts = request.form['l_key'].split("_")
+                    cls = parts[0]; dept = parts[1] if len(parts) > 1 else ""
+                    subject = request.form['lesson_subject']
+                    if allowed_keys and not any(k in request.form['l_key'] for k in allowed_keys):
+                        error = f"<div class=error>Not allowed for {level_filter} admin</div>"
+                    else:
+                        db.execute(sa.text("DELETE FROM lessons WHERE class=:c AND subject=:s"), {"c": cls, "s": subject})
+                        db.commit()
+                        db.execute(sa.text("INSERT INTO lessons (class, dept, subject, title, notes, date, media_link) VALUES (:c, :d, :s, :t, :n, :date, :m)"),
+                                   {"c": cls, "d": dept, "s": subject, "t": request.form['lesson_title'], "n": request.form['lesson_notes'], "date": str(date.today()), "m": request.form.get('media_link','')}); db.commit(); error = f"<div class=success>Lesson Posted - 1 per subject for {subject} (old replaced)</div>"
+                if "edit_question" in request.form:
+                    options = [request.form["a"],request.form["b"],request.form["c"],request.form["d"]]
+                    correct_ans = options[int(request.form["correct_ans"])]
+                    db.execute(sa.text("UPDATE questions SET q=:q, options=:o, ans=:a WHERE id=:id"),{"q": request.form["q"], "o": json.dumps(options), "a": correct_ans, "id": request.form["qid"]}); db.commit(); error = "<div class=success>Question Updated</div>"
+                if "delete_question" in request.form:
+                    db.execute(sa.text("DELETE FROM questions WHERE id=:id"), {"id": request.form["qid"]}); db.commit(); error = "<div class=error>Question Deleted</div>"
+                if "edit_lesson" in request.form:
+                    db.execute(sa.text("UPDATE lessons SET title=:t, notes=:n, media_link=:m WHERE id=:id"),{"t": request.form["lesson_title"], "n": request.form["lesson_notes"], "m": request.form.get("media_link",""), "id": request.form["lid"]}); db.commit(); error = "<div class=success>Lesson Updated</div>"
+                if "delete_lesson" in request.form:
+                    db.execute(sa.text("DELETE FROM lessons WHERE id=:id"), {"id": request.form["lid"]}); db.commit(); error = "<div class=error>Lesson Deleted</div>"
+                if "clear_all_data" in request.form:
+                    db.execute(sa.text("DELETE FROM questions")); db.execute(sa.text("DELETE FROM lessons")); db.execute(sa.text("DELETE FROM payments")); db.commit(); error = "<div class=error>⚠️ All Old Data Deleted</div>"
+                if "change_pass" in request.form:
+                    if request.form["old_pass"]!= ADMIN_PASS: error = "<div class=error>Old password wrong</div>"
+                    else: ADMIN_PASS = request.form["new_pass"]; set_setting("admin_pass", ADMIN_PASS); error = "<div class=success>Password Changed</div>"
+                if "post_notice" in request.form:
+                    NOTICES.insert(0, {"id": int(datetime.now().timestamp()), "title": request.form["notice_title"], "text": request.form["notice_text"], "media_link": request.form.get("media_link",""), "created_at": str(datetime.now(NIGERIA_TZ))})
+                    set_setting("notices", json.dumps(NOTICES)); error = "<div class=success>Notice Posted</div>"
+                if "edit_notice" in request.form:
+                    nid = int(request.form["notice_id"])
+                    for n in NOTICES:
+                        if n.get('id')==nid:
+                            n['title']=request.form["notice_title"]; n['text']=request.form["notice_text"]; n['media_link']=request.form.get("media_link","")
+                    set_setting("notices", json.dumps(NOTICES)); error = "<div class=success>Notice Updated</div>"
+                if "delete_notice" in request.form:
+                    nid = int(request.form["notice_id"])
+                    NOTICES = [n for n in NOTICES if n.get('id')!=nid]
+                    set_setting("notices", json.dumps(NOTICES)); error = "<div class=error>Notice Deleted</div>"
+                if "pin_notice" in request.form:
+                    set_setting("pinned_notice", json.dumps({"title": request.form["notice_title"], "text": request.form["notice_text"]}))
+                    error = "<div class=success>Pinned</div>"
+            except Exception as e:
+                error = f"<div class=error>Error: {str(e)}</div>"
+                try: db.rollback()
+                except: pass
+    pending_html = "".join([f"<div class='card'><b>{r['name']} (@{r['nickname']})</b> for {r['type']}<br><small>Bank: {r['bank_used']} | Acc: {r['account_name']}</small><div style='display:flex;gap:8px;justify-content:center'><form method=POST style='flex:1'><input type=hidden name=verify_id value={r['id']}><button class='btn' style='width:95%;max-width:150px'>✅ Verify +5 Days</button></form><form method=POST style='flex:1'><input type=hidden name=deny_id value={r['id']}><button class='btn red' style='width:95%;max-width:150px'>❌ Deny</button></form></div></div>" for r in pending_reqs])
+    complaints_html = ""
+    for c in complaints_pending:
+        ct12 = format_12h(str(c['created_at']))
+        if c['status']=='Pending':
+            reply_form = f"<form method=POST><input type=hidden name=complaint_id value={c['id']}><textarea name=reply_text placeholder='Reply...' required>{c['reply'] or ''}</textarea><button name=reply_complaint class='btn blue'>Reply</button></form>"
+        else:
+            reply_form = f"<div style='background:#d4edda;padding:5px'><b>Replied:</b> {c['reply']}</div>"
+        reply_form += f"<form method=POST><input type=hidden name=complaint_id value={c['id']}><button name=delete_complaint class='btn red'>🗑️ Delete</button></form>"
+        complaints_html+=f"<div class=card><b>{c['name']} (@{c['nickname']}) - {c['status']}</b><p>{c['text']}</p><small>{ct12}</small>{reply_form}</div>"
+    if not complaints_html: complaints_html="<p>No complaints</p>"
+    manage_notice_html = ""
+    for n in NOTICES:
+        nid = n.get('id', 0)
+        safe_title = n['title'].replace('"', '&quot;')
+        safe_text = n['text'][:100].replace('"', '&quot;')
+        manage_notice_html+=f'<div class=card><b>📢 {safe_title}</b><p>{safe_text}...</p><a class="btn blue" href="/admin?edit_notice={nid}&level={level_filter or ""}">✏️ Edit</a><form method=POST><input type=hidden name=notice_id value="{nid}"><button name=delete_notice class="btn red">🗑️ Delete</button></form><form method=POST><input type=hidden name=notice_title value="{safe_title}"><input type=hidden name=notice_text value="{safe_text}"><button name=pin_notice class="btn orange">📌 Pin</button></form></div>'
+    keys = ["JSS1","JSS2","JSS3","SS1_Science","SS1_Commercial","SS1_Art","SS2_Science","SS2_Commercial","SS2_Art","SS3_Science","SS3_Commercial","SS3_Art"]
+    if allowed_keys:
+        keys = [k for k in keys if k in allowed_keys]
+    labels = {"JSS1":"JSS1","JSS2":"JSS2","JSS3":"JSS3","SS1_Science":"SS1 Science","SS1_Commercial":"SS1 Commercial","SS1_Art":"SS1 Art","SS2_Science":"SS2 Science","SS2_Commercial":"SS2 Commercial","SS2_Art":"SS2 Art","SS3_Science":"SS3 Science","SS3_Commercial":"SS3 Commercial","SS3_Art":"SS3 Art"}
+    group1 = ""; group2 = ""
+    for k in keys:
+        l = labels.get(k,k)
+        group1 += f"<a href=/admin?q_target={k}&level={level_filter or ''} class='btn blue cbt-btn-fix'>➕ Add Q: {l} (100 Qs full ans)</a>"
+        group1 += f"<a href=/admin?q_target={k}&bulk=1&level={level_filter or ''} class='btn orange cbt-btn-fix'>📦 Bulk Q: {l} - Monthly Rotation</a>"
+        group2 += f"<a href=/admin?l_target={k}&level={level_filter or ''} class='btn blue cbt-btn-fix'>➕ Add Lesson: {l} - 1 per subject</a>"
+    add_q_form = ""; bulk_form = ""; daily_form = ""
+    if q_target:
+        subs = SUBJECTS.get(q_target, [])
+        sub_options = "".join([f"<option>{s}</option>" for s in subs])
+        add_q_form = f"<div class=card><h3>Add Q for {q_target} - Full Answer Text</h3><form method=POST><input type=hidden name=q_key value='{q_target}'><select name=admin_subject required><option value=''>Select Subject</option>{sub_options}</select><textarea name=q placeholder='Question' required></textarea><input name=a placeholder='Option A full text' required><input name=b placeholder='Option B full text' required><input name=c placeholder='Option C full text' required><input name=d placeholder='Option D full text' required><select name=correct_ans required><option value=0>A is Correct - Full Text Saved</option><option value=1>B is Correct</option><option value=2>C is Correct</option><option value=3>D is Correct</option></select><button name=add_question class='btn'>➕ Add Question</button></form></div>"
+        if request.args.get('bulk'):
+            bulk_form = f"<div class=card><h3>📦 Bulk for {q_target} - Monthly Rotation</h3><p>Format: Question,A,B,C,D,FullCorrectAnswerText</p>{bulk_result}<form method=POST><input type=hidden name=bulk_key value='{q_target}'><select name=bulk_subject required><option value=''>Select Subject</option>{sub_options}</select><textarea name=bulk_data placeholder='What is 2+2?,2,3,4,5,4' rows=10 required></textarea><button name=bulk_upload class='btn orange'>Upload Bulk - Old Auto-Delete</button></form></div>"
+    if not level_filter or level_filter == "":
+        daily_form = f"<div class=card><h3>🏆 Daily Challenge Upload - 70 per week (Math, Eng, Civic) - FIXED</h3><p>10 per day, format: Subject,Q,A,B,C,D,FullCorrectAns - 7 columns</p>{bulk_result}<form method=POST><input type=date name=daily_day required value='{str(date.today())}'><textarea name=daily_data placeholder='Mathematics,What is 2+2?,2,3,4,5,4' rows=8 required></textarea><button name=bulk_daily class='btn orange'>Upload Daily 10 for that date</button></form></div>"
+    add_l_form = ""
+    if l_target:
+        subs = SUBJECTS.get(l_target, [])
+        sub_options = "".join([f"<option>{s}</option>" for s in subs])
+        add_l_form = f"<div class=card><h3>Add Lesson for {l_target} - 1 Per Subject (old replaced)</h3><form method=POST><input type=hidden name=l_key value='{l_target}'><select name=lesson_subject required><option value=''>Select Subject</option>{sub_options}</select><input name=lesson_title placeholder='Title' required><textarea name=lesson_notes placeholder='Notes - 1 lesson per subject directly' rows=6 required></textarea><input name=media_link placeholder='Img/Video link'><button name=add_lesson class='btn'>➕ Add Lesson - Replace Old</button></form></div>"
+    edit_notice_form = ""
+    if edit_notice_id:
+        try:
+            nid = int(edit_notice_id)
+            note = next((n for n in NOTICES if n.get('id')==nid), None)
+            if note:
+                edit_notice_form = f"<div class=card><h3>✏️ Edit Notice</h3><form method=POST><input type=hidden name=notice_id value={note['id']}><input name=notice_title value=\"{note['title']}\" required><textarea name=notice_text required>{note['text']}</textarea><input name=media_link value=\"{note.get('media_link','')}\"><button name=edit_notice class='btn blue'>Update</button></form></div>"
+        except: pass
+    manage_html = ""
+    if manage == "questions":
+        q_filter = ""
+        if allowed_keys:
+            q_filter = " WHERE " + " OR ".join([f"key LIKE '{k}%'" for k in allowed_keys])
+        with DBSession() as db: questions = db.execute(sa.text(f"SELECT * FROM questions {q_filter} ORDER BY id DESC LIMIT 100")).mappings().all()
+        q_list = ""
+        for q in questions:
+            try: opts = json.loads(q['options'])
+            except: opts = ["","","",""]
+            q_list += f"<div class=card><b>{q['key']}</b><p>{q['q']}</p><small>A:{opts[0]} B:{opts[1]} C:{opts[2]} D:{opts[3]} | Ans:{q['ans']}</small><form method=POST style='margin-top:8px'><input type=hidden name=qid value={q['id']}><input name=q value=\"{q['q']}\" required><input name=a value=\"{opts[0]}\" required><input name=b value=\"{opts[1]}\" required><input name=c value=\"{opts[2]}\" required><input name=d value=\"{opts[3]}\" required><select name=correct_ans><option value=0 {'selected' if q['ans']==opts[0] else ''}>A</option><option value=1 {'selected' if q['ans']==opts[1] else ''}>B</option><option value=2 {'selected' if q['ans']==opts[2] else ''}>C</option><option value=3 {'selected' if q['ans']==opts[3] else ''}>D</option></select><div style='display:flex;gap:5px;justify-content:center'><button name=edit_question class='btn blue' style='flex:1;max-width:140px'>✏️ Save</button><button name=delete_question class='btn red' style='flex:1;max-width:140px'>🗑️ Delete</button></div></form></div>"
+        manage_html = f"<div class=card><h2>📝 Manage Questions</h2>{q_list or '<p>No questions</p>'}</div>"
+    elif manage == "lessons":
+        with DBSession() as db: lessons = db.execute(sa.text("SELECT * FROM lessons ORDER BY id DESC LIMIT 50")).mappings().all()
+        l_list = "".join([f"<div class=card><b>{l['class']} - {l['subject']}</b><p>{l['title']}</p></div>" for l in lessons])
+        manage_html = f"<div class=card><h2>📚 Manage Lessons - 1 per subject</h2>{l_list or '<p>No lessons</p>'}</div>"
+    elif manage == "daily":
+        with DBSession() as db: daily_all = db.execute(sa.text("SELECT * FROM daily_challenge ORDER BY day DESC LIMIT 70")).mappings().all()
+        d_list = "".join([f"<div class=card><b>{d['day']} - {d['subject']}</b><p>{d['q']}</p><small>Ans: {d['ans']}</small></div>" for d in daily_all])
+        manage_html = f"<div class=card><h2>🏆 Daily Challenges</h2>{d_list or '<p>No daily</p>'}</div>"
+    elif manage == "notices":
+        manage_html = f"<div class=card><h2>📢 Manage Notices</h2>{manage_notice_html or '<p>No notices</p>'}</div>"
+    elif manage == "complaints":
+        manage_html = f"<div class=card><h2>📩 Complaints ({complaints_count})</h2>{complaints_html}</div>"
+    level_info = f"<div class=card style='border:3px solid gold'><h2>👑 {level_filter.upper() if level_filter else 'SUPER'} ADMIN</h2><p>Managing: {', '.join(allowed_keys) if allowed_keys else 'ALL'}</p></div>" if level_filter else f"<div class=card style='border:3px solid #0f3460'><h2>👑 SUPER ADMIN - All Access</h2><p><a href=/admin/jss1 class=btn blue>JSS1</a><a href=/admin/jss2 class=btn blue>JSS2</a><a href=/admin/jss3 class=btn blue>JSS3</a><a href=/admin/sss1 class=btn blue>SS1</a><a href=/admin/sss2 class=btn blue>SS2</a><a href=/admin/sss3 class=btn blue>SS3</a></p></div>"
+    html = f'''{level_info}{edit_notice_form}{add_q_form}{bulk_form}{add_l_form}{daily_form}{manage_html}
+    <div class="card"><h2>GROUP 1: CBT 100 Qs</h2><div style="display:flex;flex-direction:column;gap:8px">{group1}</div></div>
+    <div class="card"><h2>GROUP 2: LESSONS 1 Per Subject</h2><div style="display:flex;flex-direction:column;gap:8px">{group2}</div></div>
+    <div class="card"><h2>GROUP 3: MANAGE</h2><a href=/admin?manage=questions&level={level_filter or ""} class='btn blue'>Manage Qs</a><a href=/admin?manage=lessons&level={level_filter or ""} class='btn blue'>Manage Lessons</a><a href=/admin?manage=daily&level={level_filter or ""} class='btn orange'>Manage Daily</a><a href=/admin?manage=notices&level={level_filter or ""} class='btn orange'>Notices</a><a href=/admin?manage=complaints&level={level_filter or ""} class='btn red'>Complaints ({complaints_count})</a></div>
+    <div class="card"><h2>GROUP 4: PAYMENTS</h2>{pending_html or "<p>No pending</p>"}<a href=/admin_attendance?level={level_filter or ""} class='btn blue'>Attendance</a></div>
+    <div class="card"><h2>GROUP 5: SETTINGS</h2><p>Ads: Main {AD_REFRESH_MAIN}s / CBT {AD_REFRESH_CBT}s - ALL screens</p></div>'''
+    return render_template_string(BASE, title="Admin", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"{error}{html}"), timer_script="")
 
-@app.route('/admin/<password>/approve/<int:pid>')
-def admin_approve(password, pid):
-    if password!= ADMIN_PASS: return "❌"
+@app.route("/admin_attendance")
+@login_required
+def admin_attendance(nickname, user):
+    if not session.get("admin_logged_in") and not any(session.get(f"admin_{l}_logged_in") for l in ADMIN_LEVELS):
+        return redirect("/admin")
+    level_filter = request.args.get('level')
     with DBSession() as db:
-        pay = db.execute(sa.text("SELECT * FROM payments WHERE id=:i"), {"i": pid}).mappings().first()
-        if not pay: return redirect(f"/admin/{password}")
-        nickname = pay['nickname']; ptype = pay['type']
-        db.execute(sa.text("UPDATE payments SET status='Approved' WHERE id=:i"), {"i": pid})
-        if ptype == 'questions':
-            db.execute(sa.text("UPDATE users SET is_verified=TRUE, payment_verified_date=:d, q_cycle='paid' WHERE nickname=:u"), {"d": str(date.today()), "u": nickname})
-            ref = db.execute(sa.text("SELECT referred_by FROM users WHERE nickname=:u"), {"u": nickname}).scalar()
-            if ref:
-                existing = db.execute(sa.text("SELECT id FROM referrals WHERE referrer=:r AND referred=:re"), {"r": ref, "re": nickname}).scalar()
-                if existing:
-                    db.execute(sa.text("UPDATE referrals SET paid=TRUE WHERE referrer=:r AND referred=:re"), {"r": ref, "re": nickname})
-                else:
-                    db.execute(sa.text("INSERT INTO referrals (referrer, referred, paid) VALUES (:r,:re,TRUE)"), {"r": ref, "re": nickname})
-                ref_user = db.execute(sa.text("SELECT free_days, referral_count FROM users WHERE nickname=:u"), {"u": ref}).mappings().first()
-                if ref_user:
-                    already_bonus = db.execute(sa.text("SELECT bonus_given FROM referrals WHERE referrer=:r AND referred=:re"), {"r": ref, "re": nickname}).scalar()
-                    if not already_bonus:
-                        new_days = (ref_user['free_days'] or 0) + 5
-                        new_count = (ref_user['referral_count'] or 0) + 1
-                        db.execute(sa.text("UPDATE users SET free_days=:d, referral_count=:c, lesson_expiry=:exp WHERE nickname=:u"), {"d": new_days, "c": new_count, "u": ref, "exp": str(date.today() + timedelta(days=new_days))})
-                        db.execute(sa.text("UPDATE referrals SET bonus_given=TRUE WHERE referrer=:r AND referred=:re"), {"r": ref, "re": nickname})
-        elif ptype == 'lessons':
-            db.execute(sa.text("UPDATE users SET lesson_expiry=:e WHERE nickname=:u"), {"e": str(date.today() + timedelta(days=30)), "u": nickname})
-        db.commit()
-    return redirect(f"/admin/{password}")
+        users = db.execute(sa.text("SELECT name, nickname, class, dept, q_used, lesson_expiry, is_verified, last_seen, referral_count, free_days, payment_verified_date FROM users WHERE nickname!='motiz_support' ORDER BY last_seen DESC NULLS LAST")).mappings().all()
+    table = ""
+    for u in users:
+        ls_text = format_last_seen(u['last_seen']) if u['last_seen'] else "Never"
+        paid_status = "✅ Paid" if is_user_paid(dict(u)) else "Free"
+        expiry = u['payment_verified_date'] or 'None'
+        table += f"<tr><td>{u['name']}<br><small>@{u['nickname']}</small> {paid_status}</td><td>{u['class']}</td><td>{u['q_used']}</td><td>{paid_status}</td><td style='font-size:0.7rem'>{expiry}</td><td>{ls_text}</td><td>{u['referral_count'] or 0}</td><td>{u['free_days'] or 0}</td></tr>"
+    content = f"<div class=card><h2>Attendance - {level_filter or 'All'}</h2><div style='overflow-x:auto'><table border=1 style='width:100%;font-size:0.75rem;border-collapse:collapse'><tr><th>Name</th><th>Class</th><th>Q Used</th><th>Status</th><th>Expiry</th><th>Last Seen</th><th>Refs</th><th>Free Days</th></tr>{table}</table></div></div>"
+    return render_template_string(BASE, title="Attendance", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
-@app.route('/admin/<password>/reject/<int:pid>')
-def admin_reject(password, pid):
-    if password!= ADMIN_PASS: return "❌"
-    with DBSession() as db:
-        db.execute(sa.text("UPDATE payments SET status='Rejected' WHERE id=:i"), {"i": pid}); db.commit()
-    return redirect(f"/admin/{password}")
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
 
-@app.route('/admin/<password>/notice', methods=["POST"])
-def admin_notice(password):
-    if password!= ADMIN_PASS: return "❌"
-    global NOTICES
-    title = request.form.get('title',''); text = request.form.get('text',''); media = request.form.get('media_link','')
-    new_notice = {"title": title, "text": text, "media_link": media, "created_at": str(datetime.now(NIGERIA_TZ))}
-    NOTICES.insert(0, new_notice)
-    set_setting("notices", json.dumps(NOTICES))
-    with DBSession() as db:
-        db.execute(sa.text("INSERT INTO notices (title, text, media_link) VALUES (:t,:tx,:m)"), {"t": title, "tx": text, "m": media}); db.commit()
-    return redirect(f"/admin/{password}")
 
-@app.route('/admin/<password>/pin_notice', methods=["POST"])
-def admin_pin_notice(password):
-    if password!= ADMIN_PASS: return "❌"
-    title = request.form.get('title',''); text = request.form.get('text','')
-    pin = {"title": title, "text": text, "created_at": str(datetime.now(NIGERIA_TZ))}
-    set_setting("pinned_notice", json.dumps(pin))
-    global PINNED_NOTICE
-    PINNED_NOTICE = json.dumps(pin)
-    return redirect(f"/admin/{password}")
-
-@app.route('/admin/<password>/unpin_notice', methods=["POST"])
-def admin_unpin(password):
-    if password!= ADMIN_PASS: return "❌"
-    set_setting("pinned_notice", "");
-    global PINNED_NOTICE; PINNED_NOTICE = ""
-    return redirect(f"/admin/{password}")
-
-@app.route('/admin/<password>/upload_lesson', methods=["POST"])
-def admin_upload_lesson(password):
-    if password!= ADMIN_PASS: return "❌"
-    with DBSession() as db:
-        db.execute(sa.text("INSERT INTO lessons (class, dept, subject, title, notes, date, media_link) VALUES (:c,:d,:s,:t,:n,:dt,:m)"),
-        {"c": request.form['class'], "d": request.form.get('dept',''), "s": request.form['subject'], "t": request.form['title'], "n": request.form['notes'], "dt": str(date.today()), "m": request.form.get('media_link','')})
-        db.commit()
-    return redirect(f"/admin/{password}")
-
-@app.route('/admin/<password>/set_daily', methods=["POST"])
-def admin_set_daily(password):
-    if password!= ADMIN_PASS: return "❌"
-    day = request.form.get('day', str(date.today()))
-    with DBSession() as db:
-        db.execute(sa.text("DELETE FROM daily_challenge WHERE day=:d"), {"d": day})
-        # Auto WAEC mix: pick 10 random SS3 WAEC questions
-        waec_qs = db.execute(sa.text("SELECT * FROM questions WHERE key LIKE 'SS3_%' ORDER BY RANDOM() LIMIT 10")).mappings().all()
-        if not waec_qs:
-            waec_qs = db.execute(sa.text("SELECT * FROM questions ORDER BY RANDOM() LIMIT 10")).mappings().all()
-        for q in waec_qs:
-            parts = q['key'].split('_',2)
-            subj = parts[2] if len(parts)>2 else "General"
-            db.execute(sa.text("INSERT INTO daily_challenge (day, subject, q, options, ans) VALUES (:d,:s,:q,:o,:a)"),
-            {"d": day, "s": subj, "q": q['q'], "o": q['options'], "a": q['ans']})
-        db.commit()
-    return redirect(f"/admin/{password}")
-
-@app.route('/admin/<password>/reply/<int:cid>', methods=["POST"])
-def admin_reply(password, cid):
-    if password!= ADMIN_PASS: return "❌"
-    with DBSession() as db:
-        db.execute(sa.text("UPDATE complaints SET reply=:r, status='Resolved' WHERE id=:i"), {"r": request.form['reply'][:700], "i": cid}); db.commit()
-    return redirect(f"/admin/{password}")
-
-@app.route('/admin/<password>/upload_csv', methods=["POST"])
-def admin_upload_csv(password):
-    if password!= ADMIN_PASS: return "❌"
-    file = request.files.get('csv_file')
-    if not file: return "No file"
-    content = file.read().decode('utf-8')
-    reader = csv.DictReader(StringIO(content))
-    count = 0
-    with DBSession() as db:
-        for row in reader:
-            key = row.get('key','').strip()
-            q = row.get('q','').strip()
-            o1 = row.get('option1','').strip()
-            o2 = row.get('option2','').strip()
-            o3 = row.get('option3','').strip()
-            o4 = row.get('option4','').strip()
-            ans = row.get('ans','').strip()
-            if key and q and o1 and ans:
-                db.execute(sa.text("INSERT INTO questions (key, q, options, ans) VALUES (:k,:q,:o,:a)"),
-                {"k": key, "q": q, "o": json.dumps([o1,o2,o3,o4]), "a": ans})
-                count+=1
-                if count % 200 ==0: db.commit()
-        db.commit()
-    return f"✅ Uploaded {count} WAEC Questions <a href=/admin/{password}>Back</a>"
-
-@app.route('/admin/<password>/export_csv')
-def admin_export_csv(password):
-    if password!= ADMIN_PASS: return "❌"
-    with DBSession() as db:
-        qs = db.execute(sa.text("SELECT * FROM questions ORDER BY key ASC, id ASC")).mappings().all()
-    output = StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['key','q','option1','option2','option3','option4','ans'])
-    for q in qs:
-        try: opts = json.loads(q['options'])
-        except: opts = ["","","",""]
-        while len(opts)<4: opts.append("")
-        writer.writerow([q['key'], q['q'], opts[0], opts[1], opts[2], opts[3], q['ans']])
-    csv_data = output.getvalue()
-    return Response(csv_data, mimetype="text/csv", headers={"Content-Disposition":"attachment;filename=motiz_waec_questions.csv"})
-
-@app.route('/admin/<password>/reset_progress')
-def admin_reset_progress(password):
-    if password!= ADMIN_PASS: return "❌"
-    with DBSession() as db:
-        db.execute(sa.text("DELETE FROM cbt_progress"))
-        db.execute(sa.text("UPDATE users SET q_used=0, correct=0, wrong=0"))
-        db.commit()
-    return f"✅ All progress reset - Users will redo WAEC <a href=/admin/{password}>Back</a>"
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
