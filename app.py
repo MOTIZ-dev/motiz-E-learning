@@ -377,7 +377,7 @@ def splash():
     return render_template_string(f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Welcome</title><link rel="icon" type="image/png" href="{FAVICON_URL}"><meta http-equiv="refresh" content="10;url=/login">
 <style>body{{margin:0;background:linear-gradient(135deg,#0f3460,#16213e);color:white;font-family:Segoe UI;display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;text-align:center}}.logo{{font-size:2.2rem;font-weight:bold;line-height:1.3}}.progress-bar{{width:200px;height:8px;background:#fff3;border-radius:10px;overflow:hidden;margin-top:20px}}.progress-fill{{height:100%;width:0%;background:white;animation:load 10s linear forwards}} @keyframes load{{0%{{width:0%}}100%{{width:100%}}}} </style></head><body>
 <audio autoplay loop><source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg"></audio>
-<div class="logo">MOTIZ<br>E-LEARNING<br>INSTITUTION</div><div class="subtext" style="margin-top:10px">Learn. Practice. Excel.</div><div class="progress-bar"><div class="progress-fill"></div></div><p style="font-size:12px;margin-top:15px">🔊 Music Playing...</p></body></html>""")
+<div class="logo">MOTIZ<br>E-LEARNING<br>INSTITUTION</div><div class="subtext" style="margin-top:10px">Learn. Practice. Excel.</div><div class="progress-bar"><div class="progress-fill"></div></div><p style="font-size:12px;margin-top:15px">Loading….</p></body></html>""")
 
 @app.route('/register', methods=["GET","POST"])
 def register():
@@ -1364,5 +1364,7 @@ def admin_attendance(nickname, user):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+
+
 
 
