@@ -502,7 +502,6 @@ def cbt_exam(nickname, user, key, sub):
             db.execute(sa.text("INSERT INTO cbt_progress (nickname, subject_key, used) VALUES (:u, :k, 0) ON CONFLICT (nickname, subject_key) DO NOTHING"), {"u": nickname, "k": full_key})
             db.commit()
             prog = 0
-    # FIXED PAYWALL BUG
     total_limit = FREE_Q + PAID_Q if is_user_paid(user) else FREE_Q
     if prog >= total_limit or prog >= all_count:
         if not is_user_paid(user) and prog >= FREE_Q:
@@ -527,22 +526,24 @@ def cbt_exam(nickname, user, key, sub):
     q_html_pages = ""
     for i,q in enumerate(questions):
         opts = "".join([f"<label class=option><input type=radio name=q{i} value=\"{opt}\"><span>{opt}</span></label>" for opt in q["options"]])
-        q_html_pages += f"<div class='cbt-q-page' id='qpage-{i}' style='display:{'block' if i==0 else 'none'}'><div class=card style='min-height:42vh;display:flex;flex-direction:column;justify-content:center'><p><b>Q{start_index+i+1}/{end_index}</b> {q['q']}</p>{opts}</div></div>"
+        q_html_pages += f"<div class='cbt-q-page' id='qpage-{i}' style='display:{'block' if i==0 else 'none'}'><div class=card style='margin-top:2px!important; padding-top:8px!important; min-height:28vh; display:flex; flex-direction:column; justify-content:flex-start'><p style='margin-top:2px'><b>Q{start_index+i+1}/{end_index}</b> {q['q']}</p>{opts}</div></div>"
     timer_header = f"""
-    <div id=cbtTimerHeader style='position:fixed;top:0;left:0;right:0;z-index:10000;background:var(--card);border-bottom:3px solid #0f3460;padding:7px 10px;display:flex;justify-content:space-between;align-items:center'>
-      <div style='display:flex;gap:6px;align-items:center'>
-        <button onclick="location.replace('/exam')" style='background:#e94560;color:white;border:none;padding:5px 9px;border-radius:6px;font-size:0.75rem'>✕ Exit</button>
-        <button onclick="document.body.classList.toggle('dark');localStorage.setItem('motiz_theme', document.body.classList.contains('dark')?'dark':'light')" style='background:#eee;border:1px solid #ccc;padding:3px 7px;border-radius:6px;font-size:0.65rem'>🌙</button>
+    <div id=cbtTimerHeader style='position:fixed;top:0;left:0;right:0;z-index:10002;background:var(--card);border-bottom:3px solid #0f3460;padding:4px 8px;display:flex;justify-content:space-between;align-items:center;height:42px'>
+      <div style='display:flex;gap:12px;align-items:center'>
+        <button onclick="location.replace('/exam')" style='background:#e94560;color:white;border:none;width:42px;height:36px;border-radius:8px;font-size:1.4rem;display:flex;align-items:center;justify-content:center'>⬅️</button>
+        <button onclick="document.body.classList.toggle('dark');localStorage.setItem('motiz_theme', document.body.classList.contains('dark')?'dark':'light')" style='background:#eee;border:1px solid #ccc;padding:8px 16px;border-radius:10px;font-size:1.5rem'>🌙</button>
       </div>
-      <div id=timerText style='font-weight:bold;color:#0f3460'>⏰ {batch_time//60}:{batch_time%60:02d}</div>
+      <div id=timerText style='font-weight:bold;color:#0f3460;font-size:1.15rem;background:#fff3;padding:5px 12px;border-radius:8px'>⏰ {batch_time//60}:{batch_time%60:02d}</div>
       <div style='font-size:0.65rem;opacity:0.7'>{subj_emoji(sub)} {sub}</div>
     </div>
     <style>
-      body {{ overflow:hidden; height:100vh; }}
-      .container {{ margin-top:50px !important; height:calc(100vh - 110px); overflow:hidden; display:flex; flex-direction:column; }}
-      #cbtNavRow {{ position:fixed; bottom:52px; left:0; right:0; z-index:9999; background:var(--card); padding:9px; display:flex; gap:10px; justify-content:center; border-top:2px solid #0f3460; }}
-      #cbtSmallAd {{ bottom:0px !important; top:auto !important; left:0 !important; transform:none !important; width:100% !important; height:50px !important; border-radius:0 !important; border:none !important; border-top:1px solid #ddd !important; display:flex !important; }}
-      #cbtAdInner {{ width:100% !important; }}
+      body {{ overflow:hidden!important; height:100vh!important; }}
+    .container {{ margin-top:42px!important; padding-top:2px!important; height:calc(100vh - 100px)!important; overflow:hidden!important; display:flex; flex-direction:column; }}
+      #cbtNavRow {{ position:fixed; bottom:52px; left:0; right:0; z-index:10001; background:var(--card); padding:8px; display:flex; gap:12px; justify-content:center; border-top:2px solid #0f3460; }}
+      #cbtNavRow .btn {{ flex:1!important; max-width:165px!important; height:46px!important; font-size:1rem!important; display:flex!important; align-items:center; justify-content:center; margin:0!important; }}
+      #fixedAdBar {{ display:none!important; }}
+      #cbtSmallAd {{ bottom:0px!important; top:auto!important; left:0!important; transform:none!important; width:100%!important; height:50px!important; display:flex!important; z-index:10000!important; background:white!important; border-top:1px solid #ddd!important; }}
+      #cbtAdInner {{ width:100%!important; }}
     </style>
     """
     if request.method == "POST":
@@ -550,7 +551,7 @@ def cbt_exam(nickname, user, key, sub):
         for i,q in enumerate(questions):
             user_ans = request.form.get(f"q{i}")
             if not user_ans:
-                result_html += f"<div class='card' style='border-left:5px solid red'><p><b>Q{start_index+i+1}:</b> {q['q']}</p><p style='color:red'><b>Your:</b> Not Answered (Time up) - Wrong</p><p style='color:green'><b>Correct:</b> {q['ans']}</p></div>"
+                result_html += f"<div class='card' style='border-left:5px solid red'><p><b>Q{start_index+i+1}:</b> {q['q']}</p><p style='color:red'><b>Your:</b> Not Answered - Wrong</p><p style='color:green'><b>Correct:</b> {q['ans']}</p></div>"
             elif user_ans == q["ans"]:
                 score += 1
             else:
@@ -563,45 +564,66 @@ def cbt_exam(nickname, user, key, sub):
             db.commit()
         remaining = min(total_limit, all_count) - new_done
         next_btn = f"<a class=btn href=/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}>Next 10 - {remaining} left ➡️</a>" if remaining>0 else f"<a class=btn blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo {sub}</a>"
-        content = f"<div class='card' style='text-align:center'><h2>Result {subj_emoji(sub)} {sub}</h2><p><b>Score: {score}/{total}</b></p><p>Unanswered = wrong after timer</p></div>{next_btn}<a class=btn blue href=/exam>Back</a>{result_html}"
+        content = f"<div class='card' style='text-align:center'><h2>Result {subj_emoji(sub)} {sub}</h2><p><b>Score: {score}/{total}</b></p></div>{next_btn}<a class=btn blue href=/exam>Back</a>{result_html}"
         return render_template_string(BASE, title="Result", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
     timer_js = Markup(f"""
-    let timeLeft = {batch_time};
-    let currentQ = 0;
-    const totalQ = {len(questions)};
+    var timeLeft = {batch_time};
+    var currentQ = 0;
+    var totalQ = {len(questions)};
     function showQ(idx){{
-      if(idx<0) idx=0; if(idx>=totalQ) idx=totalQ-1;
-      document.querySelectorAll('.cbt-q-page').forEach((el,i)=>{{ el.style.display = i===idx ? 'block' : 'none'; }});
-      currentQ=idx;
-      document.getElementById('prevBtn').style.display = idx===0 ? 'none' : 'block';
-      document.getElementById('nextBtn').innerText = idx===totalQ-1 ? 'SUBMIT ✅' : 'NEXT ➡️';
+      if(idx<0) idx=0;
+      if(idx>=totalQ) idx=totalQ-1;
+      var pages = document.querySelectorAll('.cbt-q-page');
+      for(var i=0;i<pages.length;i++){{ pages[i].style.display = (i===idx? 'block' : 'none'); }}
+      currentQ = idx;
+      var prevBtn = document.getElementById('prevBtn');
+      var nextBtn = document.getElementById('nextBtn');
+      if(prevBtn) {{
+        prevBtn.style.display = 'flex';
+        prevBtn.style.opacity = idx===0? '0.45' : '1';
+      }}
+      if(nextBtn) {{
+        nextBtn.innerHTML = idx===totalQ-1? 'SUBMIT ✅' : 'NEXT ➡️';
+      }}
     }}
     function nextQ(){{
-      if(currentQ===totalQ-1) document.getElementById('cbt_form').submit();
-      else showQ(currentQ+1);
+      if(currentQ===totalQ-1){{
+        document.getElementById('cbt_form').submit();
+      }} else {{
+        showQ(currentQ+1);
+      }}
     }}
-    function prevQ(){{ showQ(currentQ-1); }}
-    const timerEl = document.getElementById('timerText');
-    function updateTimer(){{
+    function prevQ(){{
+      if(currentQ>0) showQ(currentQ-1);
+    }}
+    function startTimer(){{
+      var timerEl = document.getElementById('timerText');
+      if(!timerEl) return;
+      function tick(){{
         if(timeLeft <= 0){{
-            timerEl.innerHTML = '⏰ 0:00 Submitting...';
-            document.getElementById('cbt_form').submit();
-            return;
+          timerEl.innerHTML = '⏰ 0:00 Submitting...';
+          document.getElementById('cbt_form').submit();
+          return;
         }}
-        let m = Math.floor(timeLeft/60); let s = timeLeft%60;
-        timerEl.innerHTML = '⏰ ' + m + ':' + (s<10?'0'+s:s);
+        var m = Math.floor(timeLeft/60);
+        var s = timeLeft%60;
+        timerEl.innerHTML = '⏰ ' + m + ':' + (s<10? '0'+s : s);
         timeLeft--;
+      }}
+      tick();
+      setInterval(tick, 1000);
     }}
-    updateTimer(); setInterval(updateTimer,1000);
     showQ(0);
-    let cb=document.getElementById('calcBtn'); if(cb){{ cb.style.display = """ + ("'block'" if sub in CALC_SUBJECTS else "'none'") + """; }}
-    let ad = document.getElementById('cbtSmallAd'); if(ad) ad.style.display='flex';
-    let fixed = document.getElementById('fixedAdBar'); if(fixed) fixed.style.display='none';
+    startTimer();
+    var cb=document.getElementById('calcBtn');
+    if(cb) cb.style.display = '""" + ("block" if sub in CALC_SUBJECTS else "none") + """';
+    var fixed=document.getElementById('fixedAdBar'); if(fixed) fixed.style.display='none';
+    var ad=document.getElementById('cbtSmallAd'); if(ad) ad.style.display='flex';
     """)
     nav_html = """
     <div id=cbtNavRow>
-      <button type=button id=prevBtn class='btn gray' style='flex:1;max-width:120px;display:none' onclick='prevQ()'>⬅️ PREV</button>
-      <button type=button id=nextBtn class='btn' style='flex:1;max-width:120px' onclick='nextQ()'>NEXT ➡️</button>
+      <button type=button id=prevBtn class='btn gray' onclick='prevQ()'>⬅️ PREV</button>
+      <button type=button id=nextBtn class='btn' onclick='nextQ()'>NEXT ➡️</button>
     </div>
     """
     content = f"{timer_header}<form method=POST id=cbt_form style='flex:1;display:flex;flex-direction:column'>{q_html_pages}</form>{nav_html}"
