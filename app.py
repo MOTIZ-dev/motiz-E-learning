@@ -502,6 +502,7 @@ def cbt_exam(nickname, user, key, sub):
             db.execute(sa.text("INSERT INTO cbt_progress (nickname, subject_key, used) VALUES (:u, :k, 0) ON CONFLICT (nickname, subject_key) DO NOTHING"), {"u": nickname, "k": full_key})
             db.commit()
             prog = 0
+    # FIXED PAYWALL BUG
     total_limit = FREE_Q + PAID_Q if is_user_paid(user) else FREE_Q
     if prog >= total_limit or prog >= all_count:
         if not is_user_paid(user) and prog >= FREE_Q:
@@ -509,7 +510,7 @@ def cbt_exam(nickname, user, key, sub):
             if pending:
                 content = "<div class=card><h2>⏳ Payment Under Review</h2><p>Admin verifying.</p></div>"
             else:
-                content = f'<div class=card><h2>🔒 Unlock 90 More for {subj_emoji(sub)} {sub}</h2><p>Total 100 Qs: 10 free + 90 paid</p><p><b>Pay &#8358;{QUESTION_PRICE} for 30 days - Visible until expiry</b></p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account:</b><input class=readonly-box readonly value="{PALMPAY_ACCOUNT}"><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/questions><input name=bank_used placeholder="Bank you used" required><input name=account_name placeholder="Account Name" required><button class=btn>Submit</button></form><a class=btn blue href="/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1">🔄 Redo Free 10</a></div>'
+                content = f'<div class=card><h2>🔒 Unlock 90 More for {subj_emoji(sub)} {sub}</h2><p>Total 100 Qs: 10 free + 90 paid</p><p><b>Pay ₦{QUESTION_PRICE} for 30 days</b></p><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Account:</b><input class=readonly-box readonly value="{PALMPAY_ACCOUNT}"><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/questions><input name=bank_used placeholder="Bank you used" required><input name=account_name placeholder="Account Name" required><button class=btn>Submit</button></form><a class=btn blue href="/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1">🔄 Redo Free 10</a></div>'
             return render_template_string(BASE, title="Paywall", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
     start_index = prog
     end_index = min(start_index + BATCH_SIZE, total_limit, all_count)
@@ -523,13 +524,37 @@ def cbt_exam(nickname, user, key, sub):
         return render_template_string(BASE, title="Done", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>✅ Completed {sub}</h2><a class=btn href=/exam>Back to Subjects</a><a class=btn blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo</a></div>"), timer_script="")
     time_per_q = 60 if sub in CALC_SUBJECTS else 30
     batch_time = len(questions) * time_per_q
-    calc_script = "document.getElementById('calcBtn').style.display='block';" if sub in CALC_SUBJECTS else "document.getElementById('calcBtn').style.display='none';"
+    q_html_pages = ""
+    for i,q in enumerate(questions):
+        opts = "".join([f"<label class=option><input type=radio name=q{i} value=\"{opt}\"><span>{opt}</span></label>" for opt in q["options"]])
+        q_html_pages += f"<div class='cbt-q-page' id='qpage-{i}' style='display:{'block' if i==0 else 'none'}'><div class=card style='min-height:42vh;display:flex;flex-direction:column;justify-content:center'><p><b>Q{start_index+i+1}/{end_index}</b> {q['q']}</p>{opts}</div></div>"
+    timer_header = f"""
+    <div id=cbtTimerHeader style='position:fixed;top:0;left:0;right:0;z-index:10000;background:var(--card);border-bottom:3px solid #0f3460;padding:7px 10px;display:flex;justify-content:space-between;align-items:center'>
+      <div style='display:flex;gap:6px;align-items:center'>
+        <button onclick="location.replace('/exam')" style='background:#e94560;color:white;border:none;padding:5px 9px;border-radius:6px;font-size:0.75rem'>✕ Exit</button>
+        <button onclick="document.body.classList.toggle('dark');localStorage.setItem('motiz_theme', document.body.classList.contains('dark')?'dark':'light')" style='background:#eee;border:1px solid #ccc;padding:3px 7px;border-radius:6px;font-size:0.65rem'>🌙</button>
+      </div>
+      <div id=timerText style='font-weight:bold;color:#0f3460'>⏰ {batch_time//60}:{batch_time%60:02d}</div>
+      <div style='font-size:0.65rem;opacity:0.7'>{subj_emoji(sub)} {sub}</div>
+    </div>
+    <style>
+      body {{ overflow:hidden; height:100vh; }}
+      .container {{ margin-top:50px !important; height:calc(100vh - 110px); overflow:hidden; display:flex; flex-direction:column; }}
+      #cbtNavRow {{ position:fixed; bottom:52px; left:0; right:0; z-index:9999; background:var(--card); padding:9px; display:flex; gap:10px; justify-content:center; border-top:2px solid #0f3460; }}
+      #cbtSmallAd {{ bottom:0px !important; top:auto !important; left:0 !important; transform:none !important; width:100% !important; height:50px !important; border-radius:0 !important; border:none !important; border-top:1px solid #ddd !important; display:flex !important; }}
+      #cbtAdInner {{ width:100% !important; }}
+    </style>
+    """
     if request.method == "POST":
         score = 0; result_html = ""
         for i,q in enumerate(questions):
             user_ans = request.form.get(f"q{i}")
-            if user_ans == q["ans"]: score += 1
-            result_html += f"<div class='card'><h4>Q{start_index + i + 1}: {q['q']}</h4><p><b>Your Answer:</b> {user_ans or 'Not Answered'}</p><p><b>Correct:</b> {q['ans']}</p></div>"
+            if not user_ans:
+                result_html += f"<div class='card' style='border-left:5px solid red'><p><b>Q{start_index+i+1}:</b> {q['q']}</p><p style='color:red'><b>Your:</b> Not Answered (Time up) - Wrong</p><p style='color:green'><b>Correct:</b> {q['ans']}</p></div>"
+            elif user_ans == q["ans"]:
+                score += 1
+            else:
+                result_html += f"<div class='card' style='border-left:5px solid red'><p><b>Q{start_index+i+1}:</b> {q['q']}</p><p style='color:red'><b>Your:</b> {user_ans}</p><p style='color:green'><b>Correct:</b> {q['ans']}</p></div>"
         total = len(questions); wrong = total - score
         new_done = prog + total
         with DBSession() as db:
@@ -537,37 +562,50 @@ def cbt_exam(nickname, user, key, sub):
             db.execute(sa.text("UPDATE users SET q_used=q_used+:t, correct=correct+:c, wrong=wrong+:w WHERE nickname=:u"), {"t": total, "c": score, "w": wrong, "u": nickname})
             db.commit()
         remaining = min(total_limit, all_count) - new_done
-        next_btn = f"<a class=btn href=/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}>Next 10 - {remaining} left</a>" if remaining>0 else f"<a class=btn blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo {sub}</a>"
-        if score/total >= 0.5:
-            sound_js = "let ctx=new (window.AudioContext||window.webkitAudioContext)(); let notes=[523,659,784,1046]; notes.forEach((f,i)=>{let o=ctx.createOscillator(); o.frequency.value=f; o.connect(ctx.destination); o.start(ctx.currentTime+i*0.15); o.stop(ctx.currentTime+i*0.15+0.3);});"
-        else:
-            sound_js = "let ctx=new (window.AudioContext||window.webkitAudioContext)(); let o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=150; o.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.6);"
-        content = f"<div class='card'><h2>🎉 RESULT {subj_emoji(sub)} {sub}</h2><p><b>Score: {score}/{total}</b></p><p>Completed: {new_done}/{min(total_limit,all_count)}</p></div>{result_html}{next_btn}<a class=btn blue href=/exam>Back to Subjects</a><script>setTimeout(()=>{{try{{{sound_js}}}catch(e){{}}}},500)</script>"
+        next_btn = f"<a class=btn href=/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}>Next 10 - {remaining} left ➡️</a>" if remaining>0 else f"<a class=btn blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo {sub}</a>"
+        content = f"<div class='card' style='text-align:center'><h2>Result {subj_emoji(sub)} {sub}</h2><p><b>Score: {score}/{total}</b></p><p>Unanswered = wrong after timer</p></div>{next_btn}<a class=btn blue href=/exam>Back</a>{result_html}"
         return render_template_string(BASE, title="Result", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
-    q_html = ""
-    for i,q in enumerate(questions):
-        options = "".join([f"<label class=option><input type=radio name=q{i} value=\"{opt}\" required><span>{opt}</span></label>" for opt in q["options"]])
-        q_html += f"<div class=card id=q{i}><p><b>Question {start_index + i + 1}</b></p><p>{q['q']}</p>{options}</div>"
     timer_js = Markup(f"""
     let timeLeft = {batch_time};
-    const timerEl = document.createElement('div');
-    timerEl.className = 'timer';
-    document.querySelector('.container').prepend(timerEl);
+    let currentQ = 0;
+    const totalQ = {len(questions)};
+    function showQ(idx){{
+      if(idx<0) idx=0; if(idx>=totalQ) idx=totalQ-1;
+      document.querySelectorAll('.cbt-q-page').forEach((el,i)=>{{ el.style.display = i===idx ? 'block' : 'none'; }});
+      currentQ=idx;
+      document.getElementById('prevBtn').style.display = idx===0 ? 'none' : 'block';
+      document.getElementById('nextBtn').innerText = idx===totalQ-1 ? 'SUBMIT ✅' : 'NEXT ➡️';
+    }}
+    function nextQ(){{
+      if(currentQ===totalQ-1) document.getElementById('cbt_form').submit();
+      else showQ(currentQ+1);
+    }}
+    function prevQ(){{ showQ(currentQ-1); }}
+    const timerEl = document.getElementById('timerText');
     function updateTimer(){{
-        let m = Math.floor(timeLeft / 60); let s = timeLeft % 60; s = s < 10? '0' + s : s;
-        timerEl.innerHTML = '⏰ TIME LEFT: ' + m + ':' + s + ' | {subj_emoji(sub)} {sub} - {time_per_q}s per Q';
-        if(timeLeft <= 0){{ document.getElementById('cbt_form').submit(); }}
+        if(timeLeft <= 0){{
+            timerEl.innerHTML = '⏰ 0:00 Submitting...';
+            document.getElementById('cbt_form').submit();
+            return;
+        }}
+        let m = Math.floor(timeLeft/60); let s = timeLeft%60;
+        timerEl.innerHTML = '⏰ ' + m + ':' + (s<10?'0'+s:s);
         timeLeft--;
     }}
-    updateTimer(); setInterval(updateTimer, 1000);
-    {calc_script}
+    updateTimer(); setInterval(updateTimer,1000);
+    showQ(0);
+    let cb=document.getElementById('calcBtn'); if(cb){{ cb.style.display = """ + ("'block'" if sub in CALC_SUBJECTS else "'none'") + """; }}
+    let ad = document.getElementById('cbtSmallAd'); if(ad) ad.style.display='flex';
+    let fixed = document.getElementById('fixedAdBar'); if(fixed) fixed.style.display='none';
     """)
-    # FIXED: PREVIOUS / FLAG / NEXT - NEXT NOT HIDDEN BY AD
-    prev_btn = f"<a class='btn gray' href='/exam' style='flex:1;max-width:130px'>⬅️ PREVIOUS</a>"
-    flag_btn = "<button type=button class='btn orange' style='flex:1;max-width:150px' onclick=\"alert('Flagged for review')\">🚩 FLAG FOR REVIEW</button>"
-    next_btn = "<button class='btn' style='flex:1;max-width:130px'>NEXT ➡️</button>"
-    content = f"<form method=POST id=cbt_form><h2 style='background:#0f3460;color:white;text-align:center;padding:10px;border-radius:8px'>{subj_emoji(sub)} {sub} - Batch {math.floor(prog/BATCH_SIZE)+1}</h2><p style='text-align:center'>{time_per_q}s per question (Total {batch_time//60}:{batch_time%60:02d})</p>{q_html}<div class=card style='display:flex;gap:8px;justify-content:center;align-items:center;position:sticky;bottom:70px;background:var(--card);z-index:998;padding:10px;border:2px solid #0f3460'>{prev_btn}{flag_btn}{next_btn}</div></form>"
-    return render_template_string(BASE, title=f"{sub}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
+    nav_html = """
+    <div id=cbtNavRow>
+      <button type=button id=prevBtn class='btn gray' style='flex:1;max-width:120px;display:none' onclick='prevQ()'>⬅️ PREV</button>
+      <button type=button id=nextBtn class='btn' style='flex:1;max-width:120px' onclick='nextQ()'>NEXT ➡️</button>
+    </div>
+    """
+    content = f"{timer_header}<form method=POST id=cbt_form style='flex:1;display:flex;flex-direction:column'>{q_html_pages}</form>{nav_html}"
+    return render_template_string(BASE, title=f"{sub}", header="", content=Markup(content), timer_script=timer_js)
 
 @app.route('/confirm/<t>', methods=["POST"])
 @login_required
