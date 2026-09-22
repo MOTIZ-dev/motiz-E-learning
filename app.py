@@ -538,7 +538,7 @@ def cbt_exam(nickname, user, key, sub):
     </div>
     <style>
       body {{ overflow:hidden!important; height:100vh!important; }}
-   .container {{ margin-top:38px!important; padding-top:1px!important; height:calc(100vh - 95px)!important; overflow:hidden!important; display:flex; flex-direction:column; }}
+  .container {{ margin-top:38px!important; padding-top:1px!important; height:calc(100vh - 95px)!important; overflow:hidden!important; display:flex; flex-direction:column; }}
       #cbtNavRow {{ position:fixed; bottom:50px; left:0; right:0; z-index:10001; background:var(--card); padding:6px; display:flex; gap:10px; justify-content:center; border-top:2px solid #0f3460; }}
       #cbtNavRow .btn {{ flex:1!important; max-width:145px!important; height:40px!important; font-size:0.9rem!important; display:flex!important; align-items:center; justify-content:center; margin:0!important; }}
       #fixedAdBar {{ display:none!important; }}
@@ -629,15 +629,6 @@ def cbt_exam(nickname, user, key, sub):
     """
     content = f"{timer_header}<form method=POST id=cbt_form style='flex:1;display:flex;flex-direction:column'>{q_html_pages}</form>{nav_html}"
     return render_template_string(BASE, title=f"{sub}", header="", content=Markup(content), timer_script=timer_js)
-
-@app.route('/confirm/<t>', methods=["POST"])
-@login_required
-def confirm(nickname, user, t):
-    with DBSession() as db:
-        db.execute(sa.text("INSERT INTO payments (nickname, name, type, status, bank_used, account_name, date_paid) VALUES (:u, :n, :t, 'Pending', :b, :a, :d)"),
-        {"u": nickname, "n": user["name"], "t": t, "b": request.form["bank_used"], "a": request.form["account_name"], "d": str(date.today())});
-        db.commit()
-    return render_template_string(BASE, title="Sent", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class='card'><h2>✅ Request Sent</h2><p>Admin will verify within 24hrs</p></div>"), timer_script="")
 @app.route('/lessons')
 @login_required
 def lessons(nickname, user):
