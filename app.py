@@ -245,12 +245,15 @@ body.dark{{--bg:#121212;--card:#1e1e1e;--text:#eee}} body.light{{--bg:#f0f2f5;--
 .card:last-child{{margin-bottom:90px!important}}
 .btn{{background:#28a745;color:white!important;padding:10px;display:block;margin:8px auto;text-align:center;font-weight:bold;border:none;width:95%;max-width:350px;border-radius:8px;cursor:pointer}}
 .btn.red{{background:#e94560!important}}.btn.blue{{background:#0f3460!important;border:1px solid white}}.btn.orange{{background:#ff9800!important}}.btn.gray{{background:#555!important;width:90%;max-width:300px;font-size:0.85rem}}
-input,select,textarea{{width:100%;padding:10px;margin:5px 0;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;background:var(--card);color:var(--text)}}
+input:not([type=radio]),select,textarea{{width:100%;padding:10px;margin:5px 0;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;background:var(--card);color:var(--text)}}
+.option{{background:#f0f2f5;padding:14px 16px;margin:10px 0;border-radius:10px;color:black;display:flex;gap:14px;align-items:center;justify-content:flex-start;text-align:left;cursor:pointer;width:100%;box-sizing:border-box;border:1px solid #dee2e6}}
+.option input[type=radio]{{width:20px!important;height:20px!important;flex-shrink:0;margin:0!important;accent-color:#0f3460}}
+.option span{{flex:1;text-align:left;font-size:1rem;word-break:break-word}}
+.option:has(input:checked){{background:#0f3460!important;color:white!important;border-color:#0f3460}}
+.option:hover{{background:#dee2e6}}
 .badge{{background:#1DA1F2;color:white;padding:3px 8px;border-radius:10px;font-size:0.7rem;white-space:nowrap;display:inline-flex;align-items:center;line-height:1;max-width:100%}}
 .badge.gold{{background:gold;color:#0f3460;font-weight:bold;white-space:nowrap}}.badge.verified-paid{{background:#28a745;color:white;white-space:nowrap}}
 .timer{{background:#e94560;color:white;padding:12px;text-align:center;border-radius:8px;font-weight:bold;position:sticky;top:92px;z-index:998;margin-bottom:10px}}
-.option{{background:#f0f2f5;padding:14px;margin:10px 0;border-radius:8px;color:black;display:flex;gap:12px;align-items:flex-start;justify-content:flex-start;text-align:left}}
-.option span{{flex:1;text-align:left}}
 .chat-msg{{display:flex;margin:8px 0;gap:8px}}.chat-msg.me{{justify-content:flex-end}}.chat-msg.other{{justify-content:flex-start}}
 .bubble{{padding:10px 14px;border-radius:18px;max-width:70%}}.me.bubble{{background:#2196f3!important;color:white!important}}.other.bubble{{background:#e0e0e0;color:#333}}
 .bubble-time{{font-size:11px;opacity:0.8;align-self:flex-end;margin-top:2px;display:flex;gap:6px}}
@@ -270,6 +273,9 @@ input,select,textarea{{width:100%;padding:10px;margin:5px 0;border-radius:5px;bo
 .bg-option{{width:35px;height:35px;border-radius:50%;display:inline-block;margin:4px;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.3)}}
 .bg-option.selected{{border:3px solid #0f3460;transform:scale(1.2)}}
 .like-row{{display:flex;gap:8px;justify-content:flex-start;align-items:center;margin-top:8px}}
+.dm-top-actions{{position:fixed;top:82px;left:0;right:0;background:var(--card);padding:6px 10px;display:flex;gap:8px;justify-content:center;z-index:998;border-bottom:1px solid #ddd}}
+.dm-top-actions .btn{{width:auto!important;padding:5px 12px!important;font-size:0.75rem!important;margin:0!important;max-width:120px!important}}
+#cbt_form{{padding-bottom:80px}}
 </style></head><body>
 <div id="updateBanner">🔄 New version - <button onclick="location.reload(true)" style="background:white;color:#ff9800;border:none;padding:5px 10px;border-radius:5px">Update now</button></div>
 {{{{header}}}}<div class="container">{{{{content}}}}</div>
@@ -279,7 +285,6 @@ input,select,textarea{{width:100%;padding:10px;margin:5px 0;border-radius:5px;bo
 <button id="calcBtn" onclick="document.getElementById('calcFloat').style.display='block'" style="position:fixed;bottom:85px;right:15px;background:#ff9800;color:white;border:none;border-radius:50%;width:55px;height:55px;font-size:1.5rem;z-index:9997;display:none;box-shadow:0 4px 10px rgba(0,0,0,0.3)">🧮</button>
 <script>
 {{{{timer_script}}}}
-// ADS ON ALL SCREENS - FIXED
 if(window.location.pathname.startsWith('/cbt/')){{
   document.getElementById('fixedAdBar').style.display='none';
   document.getElementById('cbtSmallAd').style.display='flex';
@@ -337,7 +342,6 @@ def get_header(nickname,user, show_nav=True, show_favicon=False, is_home=False):
     verified = '<span class=badge gold>✓ MOTIZ SUPPORT</span>' if is_support else ('<span class=badge verified-paid>✓ Verified Paid</span>' if is_user_paid(user) else "")
     nav_html = f"""<div class="nav"><a href="/main">🏠 Home</a><a href="/exam">✍️ CBT</a><a href="/daily">🏆 Daily</a><a href="/lessons">🎓 Lessons</a><a href="/community">🌍 Community</a><a href="/chat">💬 Chat{bell}</a><a href="/me">👤 Me</a><a href="/complain">📩 Complain</a></div>""" if show_nav else ""
     return f"""<div class="header">{favicon_html}{exit_html}<h1 style="color:white!important">MOTIZ {verified}</h1>{theme_html}</div>{nav_html}"""
-
 @app.route('/manifest.json')
 def manifest():
     return Response(json.dumps({"name":"MOTIZ E-LEARNING","short_name":"MOTIZ","start_url":"/main","display":"standalone","background_color":"#0f3460","theme_color":"#0f3460","icons":[{"src":FAVICON_URL,"sizes":"192x192","type":"image/png"}]}), mimetype='application/json')
@@ -441,6 +445,7 @@ def main(nickname, user):
 def logout():
     session.clear()
     return redirect("/login")
+
 @app.route('/exam')
 @login_required
 def exam(nickname, user):
@@ -511,14 +516,13 @@ def cbt_exam(nickname, user, key, sub):
     with DBSession() as db:
         batch_q = db.execute(sa.text(f"SELECT * FROM questions WHERE key=:k ORDER BY id ASC LIMIT :limit OFFSET :off"), {"k": full_key, "limit": end_index-start_index, "off": start_index}).mappings().all()
     questions = [dict(q) for q in batch_q]
-    for q in questions: 
+    for q in questions:
         try: q['options'] = json.loads(q['options'])
         except: q['options'] = []
     if not questions:
         return render_template_string(BASE, title="Done", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>✅ Completed {sub}</h2><a class=btn href=/exam>Back to Subjects</a><a class=btn blue href='/cbt/{urllib.parse.quote(key)}/{urllib.parse.quote(sub)}?redo=1'>🔄 Redo</a></div>"), timer_script="")
     time_per_q = 60 if sub in CALC_SUBJECTS else 30
     batch_time = len(questions) * time_per_q
-    # Calculator show only for calc subjects
     calc_script = "document.getElementById('calcBtn').style.display='block';" if sub in CALC_SUBJECTS else "document.getElementById('calcBtn').style.display='none';"
     if request.method == "POST":
         score = 0; result_html = ""
@@ -558,7 +562,11 @@ def cbt_exam(nickname, user, key, sub):
     updateTimer(); setInterval(updateTimer, 1000);
     {calc_script}
     """)
-    content = f"<form method=POST id=cbt_form><h2 style='background:#0f3460;color:white;text-align:center;padding:10px;border-radius:8px'>{subj_emoji(sub)} {sub} - Batch {math.floor(prog/BATCH_SIZE)+1}</h2><p style='text-align:center'>{time_per_q}s per question (Total {batch_time//60}:{batch_time%60:02d})</p>{q_html}<button class='btn orange'>Submit</button></form>"
+    # FIXED: PREVIOUS / FLAG / NEXT - NEXT NOT HIDDEN BY AD
+    prev_btn = f"<a class='btn gray' href='/exam' style='flex:1;max-width:130px'>⬅️ PREVIOUS</a>"
+    flag_btn = "<button type=button class='btn orange' style='flex:1;max-width:150px' onclick=\"alert('Flagged for review')\">🚩 FLAG FOR REVIEW</button>"
+    next_btn = "<button class='btn' style='flex:1;max-width:130px'>NEXT ➡️</button>"
+    content = f"<form method=POST id=cbt_form><h2 style='background:#0f3460;color:white;text-align:center;padding:10px;border-radius:8px'>{subj_emoji(sub)} {sub} - Batch {math.floor(prog/BATCH_SIZE)+1}</h2><p style='text-align:center'>{time_per_q}s per question (Total {batch_time//60}:{batch_time%60:02d})</p>{q_html}<div class=card style='display:flex;gap:8px;justify-content:center;align-items:center;position:sticky;bottom:70px;background:var(--card);z-index:998;padding:10px;border:2px solid #0f3460'>{prev_btn}{flag_btn}{next_btn}</div></form>"
     return render_template_string(BASE, title=f"{sub}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
 
 @app.route('/confirm/<t>', methods=["POST"])
@@ -569,7 +577,6 @@ def confirm(nickname, user, t):
         {"u": nickname, "n": user["name"], "t": t, "b": request.form["bank_used"], "a": request.form["account_name"], "d": str(date.today())});
         db.commit()
     return render_template_string(BASE, title="Sent", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class='card'><h2>✅ Request Sent</h2><p>Admin will verify within 24hrs</p></div>"), timer_script="")
-
 @app.route('/lessons')
 @login_required
 def lessons(nickname, user):
@@ -582,12 +589,10 @@ def lessons(nickname, user):
                     db.execute(sa.text("UPDATE users SET lesson_expiry=NULL WHERE nickname=:u"), {"u": nickname}); db.commit()
                     user['lesson_expiry']=None
             except: pass
-        # LESSON DIRECT - 1 lesson per subject
         if is_user_paid(user) or user.get('lesson_expiry'):
             all_lessons = db.execute(sa.text("SELECT * FROM lessons WHERE class=:c AND (dept=:d OR dept='' OR dept IS NULL) ORDER BY subject ASC"), {"c": user['class'], "d": user.get('dept','')}).mappings().all()
             if not all_lessons:
                 return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🎓 No lessons yet for {user['class']} {user.get('dept','')}</h2><p>Admin will upload 1 lesson per subject directly</p></div>"), timer_script="")
-            # Group by subject - show 1 per subject
             by_subject = {}
             for l in all_lessons:
                 if l['subject'] not in by_subject:
@@ -615,9 +620,7 @@ def daily_challenge_page(nickname, user):
     today = date.today()
     with DBSession() as db:
         db.execute(sa.text("UPDATE users SET last_seen=NOW() WHERE nickname=:u"), {"u": nickname}); db.commit()
-        # Get today's 10 questions - Math, English, Civic only
         todays = db.execute(sa.text("SELECT * FROM daily_challenge WHERE day=:d ORDER BY id ASC LIMIT 10"), {"d": str(today)}).mappings().all()
-        # Leaderboard Top 10 today
         leaderboard = db.execute(sa.text("SELECT nickname, name, score FROM daily_scores WHERE day=:d ORDER BY score DESC, created_at ASC LIMIT 10"), {"d": str(today)}).mappings().all()
         leader_html = "<div class=card style='border:2px solid gold'><h3>🏆 Leaderboard Today - Top 10</h3>"
         if not leaderboard:
@@ -634,7 +637,6 @@ def daily_challenge_page(nickname, user):
             for i, q in enumerate(todays):
                 ans = request.form.get(f"q{i}")
                 if ans == q['ans']: score += 1
-            # Save score - replace if exists today
             exists = db.execute(sa.text("SELECT id FROM daily_scores WHERE nickname=:u AND day=:d"), {"u": nickname, "d": str(today)}).scalar()
             if exists:
                 db.execute(sa.text("UPDATE daily_scores SET score=:s, created_at=NOW() WHERE nickname=:u AND day=:d"), {"s": score, "u": nickname, "d": str(today)})
@@ -650,6 +652,7 @@ def daily_challenge_page(nickname, user):
             q_html += f"<div class=card><p><b>Q{i+1} [{q['subject']}]</b> {q['q']}</p>{options}</div>"
         content = f"<div class=card><h2>🏆 Daily Challenge FREE - {today}</h2><p>10 Questions (Mathematics, English, Civic)</p></div>{leader_html}<form method=POST>{q_html}<button class=btn orange>Submit Daily Challenge</button></form>"
         return render_template_string(BASE, title="Daily Challenge", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
+
 @app.route('/complain', methods=["GET","POST"])
 @login_required
 def complain_page(nickname, user):
@@ -740,7 +743,6 @@ def community(nickname, user):
         text_html = f"<div class='community-bg-post' style='background:{bg_val}'>{p['text']}</div>" if bg_val else f"<p>{p['text']}</p>"
         html+=f"<div class=card {style}><b>{p['name']}</b>{badge_html}<br><small>{t12}</small>{text_html}{del_btn}<div class=like-row><a class='btn gray' href='/like/{p['id']}' style='flex:1;padding:6px 8px;font-size:0.8rem;margin:0'>👍 Like ({len(likes)})</a><a class='btn gray' href='/post/{p['id']}' style='flex:1;padding:6px 8px;font-size:0.8rem;margin:0'>💬 Comment ({len(comments)})</a></div></div>"
     return render_template_string(BASE, title="Community", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(html), timer_script="")
-
 @app.route('/like/<int:pid>')
 @login_required
 def like_post(nickname, user, pid):
@@ -796,7 +798,8 @@ def chat(nickname, user):
                 last = format_last_seen(u['last_seen']) if u.get('last_seen') else "Unknown"
                 unread = get_unread_per_friend(nickname, f)
                 bell = f" <span style='background:red;color:white;padding:2px 6px;border-radius:10px;font-size:0.7rem'>🔔{unread}</span>" if unread>0 else ""
-                friend_cards+=f"<div class=friend-card><a href=/dm/{f} style='display:flex;align-items:center;gap:10px;flex:1;text-decoration:none;color:inherit'><div class=friend-avatar>{f[0].upper()}</div><div><b>{u['name']}</b>{bell}<br><small>{last}</small></div></a><a href=/unfriend/{f} class=btn red style='width:auto;padding:5px 8px;font-size:0.7rem;margin:0' onclick=\"return confirm('Unfriend {f}?')\">Unfriend</a><a href=/block/{f} class=btn gray style='width:auto;padding:5px 8px;font-size:0.7rem;margin:0' onclick=\"return confirm('Block {f}? They cannot message you again')\">Block</a></div>"
+                # FIXED: CHAT LIST CLEAN - NO BLOCK/UNFRIEND HERE
+                friend_cards+=f"<a href=/dm/{f} class=friend-card><div class=friend-avatar>{f[0].upper()}</div><div><b>{u['name']}</b>{bell}<br><small>{last}</small></div></a>"
         groups = db.execute(sa.text("SELECT * FROM groups")).mappings().all()
         group_html = ""
         for g in groups:
@@ -820,7 +823,6 @@ def block_friend(nickname, user, f):
         if f in friends: friends.remove(f)
         if f not in blocked: blocked.append(f)
         db.execute(sa.text("UPDATE users SET friends=:f, blocked=:b WHERE nickname=:u"), {"f": json.dumps(friends), "b": json.dumps(blocked), "u": nickname})
-        # Remove from other user's friends too
         other = db.execute(sa.text("SELECT friends FROM users WHERE nickname=:u"), {"u": f}).mappings().first()
         if other:
             try: of = json.loads(other['friends'] or '[]')
@@ -922,7 +924,6 @@ def add_friend(nickname, user, f):
 @login_required
 def dm_page(nickname, user, other):
     with DBSession() as db:
-        # BLOCK CHECK - NEW
         if other in user.get('blocked', []):
             return render_template_string(BASE, title="Blocked", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🚫 You blocked {other}</h2><p>Unblock from chat page to message again</p><a class=btn href=/chat>Back to Chat</a></div>"), timer_script="")
         other_user = db.execute(sa.text("SELECT * FROM users WHERE nickname=:o"), {"o": other}).mappings().first()
@@ -1022,7 +1023,10 @@ def dm_page(nickname, user, other):
     if other == 'motiz_support':
         verified_badge = " <span class=badge style='background:gold;color:#0f3460;white-space:nowrap'>✓ VERIFIED SUPPORT</span>"
 
-    content = f"<h3>💬 {other_user['name']}{verified_badge} ({format_last_seen(other_user.get('last_seen'))})</h3><div id=chatBox>{chat_html}</div><form method=POST class=chat-input-fixed><div id=replyPreview class=reply-preview style='display:none'><span id=replyPreviewText></span><button type=button onclick='cancelReply()' style='background:red;color:white;border:none;border-radius:50%;width:20px'>X</button></div><input type=hidden name=reply_to id=replyToInput><div style='display:flex;gap:5px'><input name=text id=chatInput placeholder='Type message... (max 700)' required autocomplete=off maxlength=700 style='flex:1'><button class=send-img-btn><img src={SEND_BTN_URL}></button></div></form><div id=msgMenu style='display:none'></div><div style='text-align:center;margin-top:80px'><a href=/block/{other} class=btn red style='width:45%;display:inline-block' onclick=\"return confirm('Block {other}?')\">🚫 Block</a><a href=/unfriend/{other} class=btn gray style='width:45%;display:inline-block' onclick=\"return confirm('Unfriend {other}?')\">👋 Unfriend</a></div>"
+    # FIXED: SMALL TOP SIDE-BY-SIDE BLOCK/UNFRIEND
+    top_bar = f"<div style='height:45px'></div><div class=dm-top-actions><a class='btn red' href='/block/{other}' style='background:#e94560'>🚫 Block</a><a class='btn gray' href='/unfriend/{other}' style='background:#555'>👋 Unfriend</a></div>"
+
+    content = f"<h3>💬 {other_user['name']}{verified_badge} ({format_last_seen(other_user.get('last_seen'))})</h3>{top_bar}<div id=chatBox>{chat_html}</div><form method=POST class=chat-input-fixed><div id=replyPreview class=reply-preview style='display:none'><span id=replyPreviewText></span><button type=button onclick='cancelReply()' style='background:red;color:white;border:none;border-radius:50%;width:20px'>X</button></div><input type=hidden name=reply_to id=replyToInput><div style='display:flex;gap:5px'><input name=text id=chatInput placeholder='Type message... (max 700)' required autocomplete=off maxlength=700 style='flex:1'><button class=send-img-btn><img src={SEND_BTN_URL}></button></div></form><div id=msgMenu style='display:none'></div>"
     return render_template_string(BASE, title=f"Chat {other}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
 
 @app.route('/check_dm/<other>')
@@ -1031,6 +1035,7 @@ def check_dm(nickname, user, other):
     with DBSession() as db:
         cnt = db.execute(sa.text("SELECT COUNT(*) FROM dms WHERE (from_nickname=:u AND to_nickname=:o) OR (from_nickname=:o AND to_nickname=:u)"), {"u": nickname, "o": other}).scalar()
     return Response(json.dumps({"count": cnt}), mimetype="application/json")
+
 @app.route('/create_group', methods=["GET","POST"])
 @login_required
 def create_group(nickname, user):
@@ -1204,13 +1209,11 @@ def admin(nickname, user):
                     for parts in reader:
                         try:
                             if len(parts) < 6: continue
-                            # FIXED: Support both 6 cols (Subject,Q,A,B,C,D where D is also ans) and 7 cols (Subject,Q,A,B,C,D,Ans)
                             if len(parts) == 7:
                                 subj,q,a,b,c,d,ans = [x.strip() for x in parts]
                             else:
                                 subj,q,a,b,c,d = [x.strip() for x in parts[:6]]
-                                ans = d # if only 6 cols, last is ans, assume D is correct for backward compat - better require 7
-                                # Actually expect 7, so if 6, treat as missing ans -> use last
+                                ans = d
                             options = [a,b,c,d]
                             db.execute(sa.text("INSERT INTO daily_challenge (day, subject, q, options, ans) VALUES (:d, :s, :q, :o, :a)"), {"d": day_str, "s": subj, "q": q, "o": json.dumps(options), "a": ans})
                             success+=1
@@ -1363,8 +1366,4 @@ def admin_attendance(nickname, user):
     return render_template_string(BASE, title="Attendance", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
-
-
-
-
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
