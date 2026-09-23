@@ -525,26 +525,25 @@ def cbt_exam(nickname, user, key, sub):
     batch_time = len(questions) * time_per_q
     q_html_pages = ""
     for i,q in enumerate(questions):
-        opts = "".join([f"<label class=option style='padding:6px 8px!important; margin:4px 0!important; font-size:0.88rem'><input type=radio name=q{i} value=\"{opt}\"><span>{opt}</span></label>" for opt in q["options"]])
-        q_html_pages += f"<div class='cbt-q-page' id='qpage-{i}' style='display:{'block' if i==0 else 'none'}'><div class=card style='margin-top:1px!important; padding:6px 8px!important; min-height:18vh!important; font-size:0.9rem'><p style='margin:2px 0 6px 0; font-size:0.92rem'><b>Q{start_index+i+1}/{end_index}</b> {q['q']}</p>{opts}</div></div>"
+        opts = "".join([f"<label class=option style='padding:5px 8px!important;margin:3px 0!important;font-size:0.86rem'><input type=radio name=q{i} value=\"{opt}\"><span>{opt}</span></label>" for opt in q["options"]])
+        q_html_pages += f"<div class='cbt-q-page' id='qpage-{i}' style='display:{'block' if i==0 else 'none'}'><div class=card style='margin-top:14px!important; padding:6px 10px!important; min-height:20vh!important; display:flex; flex-direction:column; justify-content:flex-start'><p style='margin:3px 0 6px 0; font-size:0.88rem'><b>Q{start_index+i+1}/{end_index}</b> {q['q']}</p>{opts}</div></div>"
     timer_header = f"""
-    <div id=cbtTimerHeader style='position:fixed;top:0;left:0;right:0;z-index:10002;background:var(--card);border-bottom:3px solid #0f3460;padding:3px 6px;display:flex;justify-content:space-between;align-items:center;height:38px'>
+    <div id=cbtTimerHeader style='position:fixed;top:0;left:0;right:0;z-index:10002;background:var(--card);border-bottom:3px solid #0f3460;padding:4px 8px;display:flex;justify-content:space-between;align-items:center;height:42px'>
       <div style='display:flex;gap:8px;align-items:center'>
-        <button onclick="location.replace('/exam')" style='background:#e94560;color:white;border:none;width:34px;height:28px;border-radius:6px;font-size:1.1rem;display:flex;align-items:center;justify-content:center'>⬅️</button>
-        <button onclick="document.body.classList.toggle('dark');localStorage.setItem('motiz_theme', document.body.classList.contains('dark')?'dark':'light')" style='background:#eee;border:1px solid #ccc;padding:3px 8px;border-radius:6px;font-size:0.9rem'>🌙</button>
+        <button onclick="location.replace('/exam')" style='background:#e94560;color:white;border:none;width:42px;height:36px;border-radius:8px;font-size:1.2rem;display:flex;align-items:center;justify-content:center'>⬅️</button>
+        <button onclick="document.body.classList.toggle('dark');localStorage.setItem('motiz_theme', document.body.classList.contains('dark')?'dark':'light')" style='background:#eee;border:1px solid #ccc;width:42px;height:36px;border-radius:8px;font-size:1.2rem;display:flex;align-items:center;justify-content:center'>🌙</button>
       </div>
-      <div id=timerText style='font-weight:bold;color:#0f3460;font-size:1rem;background:#fff3;padding:3px 8px;border-radius:6px'>⏰ {batch_time//60}:{batch_time%60:02d}</div>
-      <div style='font-size:0.6rem;opacity:0.7'>{subj_emoji(sub)} {sub}</div>
+      <div id=timerText style='font-weight:bold;color:#0f3460;font-size:1.15rem;background:#fff3;padding:5px 12px;border-radius:8px'>⏰ {batch_time//60}:{batch_time%60:02d}</div>
+      <div style='font-size:0.65rem;opacity:0.7'>{subj_emoji(sub)} {sub}</div>
     </div>
     <style>
       body {{ overflow:hidden!important; height:100vh!important; }}
-  .container {{ margin-top:38px!important; padding-top:1px!important; height:calc(100vh - 95px)!important; overflow:hidden!important; display:flex; flex-direction:column; }}
-      #cbtNavRow {{ position:fixed; bottom:50px; left:0; right:0; z-index:10001; background:var(--card); padding:6px; display:flex; gap:10px; justify-content:center; border-top:2px solid #0f3460; }}
-      #cbtNavRow .btn {{ flex:1!important; max-width:145px!important; height:40px!important; font-size:0.9rem!important; display:flex!important; align-items:center; justify-content:center; margin:0!important; }}
+     .container {{ margin-top:46px!important; padding-top:2px!important; height:calc(100vh - 102px)!important; overflow:hidden!important; display:flex; flex-direction:column; }}
+      #cbtNavRow {{ position:fixed; bottom:50px; left:0; right:0; z-index:10001; background:var(--card); padding:8px; display:flex; gap:12px; justify-content:center; border-top:2px solid #0f3460; }}
+      #cbtNavRow .btn {{ flex:1!important; max-width:165px!important; height:46px!important; font-size:1rem!important; display:flex!important; align-items:center; justify-content:center; margin:0!important; }}
       #fixedAdBar {{ display:none!important; }}
-      #cbtSmallAd {{ bottom:0px!important; top:auto!important; left:0!important; transform:none!important; width:100%!important; height:50px!important; display:flex!important; z-index:9999!important; background:white!important; border-top:1px solid #ddd!important; visibility:visible!important; opacity:1!important; }}
-      #cbtAdInner {{ width:100%!important; min-height:50px!important; display:flex!important; align-items:center; justify-content:center; }}
-      #cbtAdInner iframe {{ max-width:100%!important; }}
+      #cbtSmallAd {{ position:fixed!important; bottom:0!important; left:0!important; right:0!important; width:100%!important; height:50px!important; display:flex!important; z-index:10000!important; background:white!important; border-top:1px solid #ddd!important; }}
+      #cbtAdInner {{ width:100%!important; height:50px!important; display:flex!important; align-items:center; justify-content:center; overflow:hidden!important; }}
     </style>
     """
     if request.method == "POST":
@@ -619,16 +618,39 @@ def cbt_exam(nickname, user, key, sub):
     var cb=document.getElementById('calcBtn');
     if(cb) cb.style.display = '""" + ("block" if sub in CALC_SUBJECTS else "none") + """';
     var fixed=document.getElementById('fixedAdBar'); if(fixed) fixed.style.display='none';
-    var ad=document.getElementById('cbtSmallAd'); if(ad) {{ ad.style.display='flex'; ad.style.visibility='visible'; }}
+    var ad=document.getElementById('cbtSmallAd'); if(ad) ad.style.display='flex';
     """)
     nav_html = """
     <div id=cbtNavRow>
       <button type=button id=prevBtn class='btn gray' onclick='prevQ()'>⬅️ PREV</button>
       <button type=button id=nextBtn class='btn' onclick='nextQ()'>NEXT ➡️</button>
     </div>
+    <div id=cbtSmallAd>
+      <div id=cbtAdInner>
+        <script type="text/javascript">
+          atOptions = {
+            'key' : 'f0869e31689755e244912b438511f4a9',
+            'format' : 'iframe',
+            'height' : 50,
+            'width' : 320,
+            'params' : {}
+          };
+        </script>
+        <script type="text/javascript" src="//www.highperformanceformat.com/f0869e31689755e244912b438511f4a9/invoke.js"></script>
+      </div>
+    </div>
     """
     content = f"{timer_header}<form method=POST id=cbt_form style='flex:1;display:flex;flex-direction:column'>{q_html_pages}</form>{nav_html}"
     return render_template_string(BASE, title=f"{sub}", header="", content=Markup(content), timer_script=timer_js)
+
+@app.route('/confirm/<t>', methods=["POST"])
+@login_required
+def confirm(nickname, user, t):
+    with DBSession() as db:
+        db.execute(sa.text("INSERT INTO payments (nickname, name, type, status, bank_used, account_name, date_paid) VALUES (:u, :n, :t, 'Pending', :b, :a, :d)"),
+        {"u": nickname, "n": user["name"], "t": t, "b": request.form["bank_used"], "a": request.form["account_name"], "d": str(date.today())});
+        db.commit()
+    return render_template_string(BASE, title="Sent", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class='card'><h2>✅ Request Sent</h2><p>Admin will verify within 24hrs</p></div>"), timer_script="")
 @app.route('/lessons')
 @login_required
 def lessons(nickname, user):
