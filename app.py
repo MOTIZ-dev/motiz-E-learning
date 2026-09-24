@@ -431,7 +431,7 @@ def cbt_exam(nickname, user, key, sub):
     </div>
     <style>
       body {{ overflow:hidden!important; height:100vh!important; }}
-    .container {{ margin-top:46px!important; padding-top:2px!important; height:calc(100vh - 110px)!important; overflow:hidden!important; display:flex; flex-direction:column; }}
+   .container {{ margin-top:46px!important; padding-top:2px!important; height:calc(100vh - 110px)!important; overflow:hidden!important; display:flex; flex-direction:column; }}
       #cbtNavRow {{ position:fixed; bottom:60px; left:0; right:0; z-index:10001; background:var(--card); padding:8px; display:flex; gap:12px; justify-content:center; border-top:2px solid #0f3460; }}
       #cbtNavRow.btn {{ flex:1!important; max-width:165px!important; height:46px!important; font-size:1rem!important; display:flex!important; align-items:center; justify-content:center; margin:0!important; }}
       #fixedAdBar {{ display:flex!important; }}
@@ -535,6 +535,7 @@ def lessons(nickname, user):
         if pending:
             return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>⏳ Payment Under Review</h2></div>"), timer_script="")
     return render_template_string(BASE, title="Pay Lesson", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🔒 Unlock Lessons - ₦{LESSON_PRICE}/30days</h2><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Acct:</b><input class=readonly-box readonly value={PALMPAY_ACCOUNT}><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/lessons><input name=bank_used placeholder='Bank you used' required><input name=account_name placeholder='Account Name' required><button class=btn>Submit</button></form></div>"), timer_script="")
+
 @app.route('/daily', methods=["GET","POST"])
 @login_required
 def daily_challenge_page(nickname, user):
