@@ -193,7 +193,6 @@ def get_unread_per_friend(nickname, friend):
             if nickname not in rb: c+=1
         return c
 
-# FIXED: ONLY ONE AD DOWNWARD + NO CLICK SOUND
 BASE = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="{FAVICON_URL}"><link rel="manifest" href="/manifest.json"><title>{{{{title}}}}</title><style>
 :root{{--bg:#f0f2f5;--card:white;--text:#333;--primary:#0f3460}} body{{font-family:Segoe UI;background:var(--bg);color:var(--text);margin:0;padding:0;padding-bottom:90px}}
@@ -220,8 +219,9 @@ input:not([type=radio]),select,textarea{{width:100%;padding:10px;margin:5px 0;bo
 .friend-card{{display:flex;align-items:center;gap:10px;padding:12px;background:var(--card);border-radius:10px;margin:8px 0;text-decoration:none;color:var(--text)}}
 .friend-avatar{{width:45px;height:45px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-weight:bold}}
 .readonly-box{{width:100%;padding:12px;background:#eee;border:1px dashed #999;text-align:center}}
-.chat-input-fixed{{position:fixed;bottom:65px;left:10px;right:10px;display:flex;flex-direction:column;gap:5px;background:var(--card);padding:10px;border-radius:15px;z-index:999}}
-.send-img-btn{{background:transparent;border:none}}.send-img-btn img{{height:40px;width:40px}}
+.chat-input-fixed{{position:fixed;bottom:62px;left:5px;right:5px;display:flex;flex-direction:column;gap:5px;background:var(--card);padding:8px 10px;border-radius:25px;z-index:999;box-shadow:0 -1px 5px rgba(0,0,0,0.1)}}
+.chat-input-fixed input{{flex:1;border-radius:25px!important;padding:12px 15px!important}}
+.send-img-btn{{background:transparent;border:none;flex-shrink:0}}.send-img-btn img{{height:42px;width:42px}}
 #fixedAdBar{{position:fixed;bottom:0;left:0;width:100%;height:60px;background:white;z-index:99999;border-top:1px solid #ddd;display:flex;justify-content:center;align-items:center}}
 .cbt-btn-fix{{display:block;width:95%;max-width:340px;white-space:normal;line-height:1.3;padding:10px;font-size:0.85rem;margin:8px auto}}
 .calc-float{{position:fixed;bottom:85px;right:10px;background:#222;color:white;padding:10px;border-radius:10px;z-index:9998;width:240px;display:none;border:2px solid #ff9800}}
@@ -279,7 +279,17 @@ def check_unread(nickname, user):
     return Response(json.dumps({"count": get_unread_count(nickname)}), mimetype="application/json")
 @app.route('/')
 def splash():
-    return render_template_string(f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Welcome</title><meta http-equiv="refresh" content="2;url=/login"><style>body{{margin:0;background:linear-gradient(135deg,#0f3460,#16213e);color:white;display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column}}</style></head><body><div style="font-size:2.2rem;font-weight:bold;text-align:center">MOTIZ<br>E-LEARNING</div><p>Loading...</p></body></html>""")
+    return render_template_string(f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Welcome</title>
+<meta http-equiv="refresh" content="3;url=/login">
+<style>body{{margin:0;background:linear-gradient(135deg,#0f3460,#16213e);color:white;display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column}}
+#barWrap{{width:80%;max-width:300px;height:6px;background:rgba(255,255,255,0.3);border-radius:10px;margin-top:20px;overflow:hidden}}
+#bar{{height:100%;width:0%;background:white;border-radius:10px;transition:width 2.5s linear}}</style>
+</head><body>
+<div style="font-size:2.2rem;font-weight:bold;text-align:center;line-height:1.2">MOTIZ<br>E-LEARNING<br>INSTITUTION</div>
+<div id="barWrap"><div id="bar"></div></div>
+<p style="margin-top:15px;opacity:0.8">Loading...</p>
+<script>setTimeout(function(){{document.getElementById('bar').style.width='100%';}},100);</script>
+</body></html>""")
 
 @app.route('/register', methods=["GET","POST"])
 def register():
@@ -313,7 +323,7 @@ def login():
             u = db.execute(sa.text("SELECT * FROM users WHERE nickname=:u"), {"u": nickname}).mappings().first()
             if u and u["password"] == pwd: session["nickname"] = nickname; return redirect("/main")
             else: error = "<div class=error>Invalid</div>"
-    return render_template_string(BASE, title="Login", header="", content=Markup(f"<div class='card'><h2>Login</h2>{error}<form method=POST><input name=nickname required><input type=password name=password required><button class=btn>Login</button></form></div>"), timer_script="")
+    return render_template_string(BASE, title="Login", header="", content=Markup(f"<div class='card'><h2>Login</h2>{error}<form method=POST><input name=nickname placeholder='Enter your Nickname' required><input type=password name=password placeholder='Enter your Password' required><button class=btn>Login</button><p style='text-align:center;margin-top:10px'>Don't have an account? <a href=/register>Click to Register</a></p></form></div>"), timer_script="")
 
 @app.route('/main')
 @login_required
@@ -366,7 +376,6 @@ def exam(nickname, user):
     content = f"<div class='card'><h2>Subjects for {user['class']} {user.get('dept','')}</h2>{sub_btns}</div>"
     return render_template_string(BASE, title="CBT", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
 
-# FIXED: TALLER BOX 1.5x DOWNWARD + ONLY ONE AD (fixedAdBar)
 @app.route('/cbt/<path:key>/<path:sub>', methods=["GET","POST"])
 @login_required
 def cbt_exam(nickname, user, key, sub):
@@ -422,7 +431,7 @@ def cbt_exam(nickname, user, key, sub):
     </div>
     <style>
       body {{ overflow:hidden!important; height:100vh!important; }}
-     .container {{ margin-top:46px!important; padding-top:2px!important; height:calc(100vh - 110px)!important; overflow:hidden!important; display:flex; flex-direction:column; }}
+    .container {{ margin-top:46px!important; padding-top:2px!important; height:calc(100vh - 110px)!important; overflow:hidden!important; display:flex; flex-direction:column; }}
       #cbtNavRow {{ position:fixed; bottom:60px; left:0; right:0; z-index:10001; background:var(--card); padding:8px; display:flex; gap:12px; justify-content:center; border-top:2px solid #0f3460; }}
       #cbtNavRow.btn {{ flex:1!important; max-width:165px!important; height:46px!important; font-size:1rem!important; display:flex!important; align-items:center; justify-content:center; margin:0!important; }}
       #fixedAdBar {{ display:flex!important; }}
@@ -526,7 +535,6 @@ def lessons(nickname, user):
         if pending:
             return render_template_string(BASE, title="Lessons", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup("<div class=card><h2>⏳ Payment Under Review</h2></div>"), timer_script="")
     return render_template_string(BASE, title="Pay Lesson", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"<div class=card><h2>🔒 Unlock Lessons - ₦{LESSON_PRICE}/30days</h2><p><b>Bank:</b> {PALMPAY_BANK}<br><b>Acct:</b><input class=readonly-box readonly value={PALMPAY_ACCOUNT}><br><b>Name:</b> {PALMPAY_NAME}</p><form method=POST action=/confirm/lessons><input name=bank_used placeholder='Bank you used' required><input name=account_name placeholder='Account Name' required><button class=btn>Submit</button></form></div>"), timer_script="")
-
 @app.route('/daily', methods=["GET","POST"])
 @login_required
 def daily_challenge_page(nickname, user):
@@ -562,6 +570,7 @@ def daily_challenge_page(nickname, user):
             q_html += f"<div class=card><p><b>Q{i+1} [{q['subject']}]</b> {q['q']}</p>{options}</div>"
         content = f"<div class=card><h2>🏆 Daily Challenge FREE - {today}</h2></div>{leader_html}<form method=POST>{q_html}<button class=btn orange>Submit Daily Challenge</button></form>"
         return render_template_string(BASE, title="Daily Challenge", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script="")
+
 @app.route('/complain', methods=["GET","POST"])
 @login_required
 def complain_page(nickname, user):
@@ -708,7 +717,6 @@ def chat(nickname, user):
                 unread = get_unread_per_friend(nickname, f)
                 bell = f" <span style='background:red;color:white;padding:2px 6px;border-radius:10px;font-size:0.7rem'>🔔{unread}</span>" if unread>0 else ""
                 friend_cards+=f"<a href=/dm/{f} class=friend-card><div class=friend-avatar>{f[0].upper()}</div><div><b>{u['name']}</b>{bell}<br><small>{last}</small></div></a>"
-        # FIXED: BLOCKED LIST WITH UNBLOCK & CHAT AGAIN
         blocked_html = ""
         for b in blocked:
             if b in MOTIZ_PROTECTED: continue
@@ -950,7 +958,7 @@ def dm_page(nickname, user, other):
         verified_badge = " <span class=badge style='background:gold;color:#0f3460;white-space:nowrap'>✓ VERIFIED SUPPORT</span>"
     top_bar = f"<div style='height:45px'></div><div class=dm-top-actions><a class='btn red' href='/block/{other}' style='background:#e94560'>🚫 Block</a><a class='btn gray' href='/unfriend/{other}' style='background:#555'>👋 Unfriend</a></div>" if other not in MOTIZ_PROTECTED else ""
 
-    content = f"<h3>💬 {other_user['name']}{verified_badge} ({format_last_seen(other_user.get('last_seen'))})</h3>{top_bar}<div id=chatBox>{chat_html}</div><form method=POST class=chat-input-fixed><div id=replyPreview class=reply-preview style='display:none'><span id=replyPreviewText></span><button type=button onclick='cancelReply()' style='background:red;color:white;border:none;border-radius:50%;width:20px'>X</button></div><input type=hidden name=reply_to id=replyToInput><div style='display:flex;gap:5px'><input name=text id=chatInput placeholder='Type message... (max 700)' required autocomplete=off maxlength=700 style='flex:1'><button class=send-img-btn><img src={SEND_BTN_URL}></button></div></form><div id=msgMenu style='display:none'></div>"
+    content = f"<h3>💬 {other_user['name']}{verified_badge} ({format_last_seen(other_user.get('last_seen'))})</h3>{top_bar}<div id=chatBox>{chat_html}</div><form method=POST class=chat-input-fixed><div id=replyPreview class=reply-preview style='display:none'><span id=replyPreviewText></span><button type=button onclick='cancelReply()' style='background:red;color:white;border:none;border-radius:50%;width:20px'>X</button></div><input type=hidden name=reply_to id=replyToInput><div style='display:flex;gap:5px;align-items:center;width:100%'><input name=text id=chatInput placeholder='Type message... (max 700)' required autocomplete=off maxlength=700 style='flex:1'><button class=send-img-btn><img src={SEND_BTN_URL}></button></div></form><div id=msgMenu style='display:none'></div>"
     return render_template_string(BASE, title=f"Chat {other}", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(content), timer_script=timer_js)
 
 @app.route('/check_dm/<other>')
@@ -1011,7 +1019,7 @@ def group_page(nickname, user, gid):
         cls = "me" if is_me else "other"
         t12 = format_12h(m.get('time',''))
         html+=f"<div class='chat-msg {cls}'><div class='bubble {cls}'><b>{m['name']}</b><br>{m['text']}<div class='bubble-time'>{t12}</div></div></div>"
-    html+=f"<form method=POST class=chat-input-fixed><input name=text placeholder='Type message... (max 700)' required maxlength=700><button class=send-img-btn><img src={SEND_BTN_URL}></button></form>"
+    html+=f"<form method=POST class=chat-input-fixed><div style='display:flex;gap:5px;width:100%'><input name=text placeholder='Type message... (max 700)' required maxlength=700 style='flex:1'><button class=send-img-btn><img src={SEND_BTN_URL}></button></div></form>"
     timer_js = Markup("""
     let exitBtn = document.querySelector('.exit-btn');
     if(exitBtn) exitBtn.setAttribute('onclick', "location.replace('/chat')");
@@ -1035,7 +1043,6 @@ def admin_level(level):
         return render_template_string(BASE, title=f"Admin {level.upper()}", header="", content=Markup(f"<div class='card'><h2>🔒 {level.upper()} Admin Login</h2><p>Use main pass or {level} pass</p>{error}<form method=POST><input type=password name=login_pass placeholder='Enter {level} Admin Password' required><button class=btn>Login</button></form></div>"), timer_script="")
     return redirect(f"/admin?level={level}")
 
-# NEW: CLEAR ROUTES - FIXED FOR YOUR REQUEST
 @app.route('/admin/clear_questions/<path:cls_key>')
 def clear_questions_admin(cls_key):
     if not session.get("admin_logged_in") and not any(session.get(f"admin_{l}_logged_in") for l in ADMIN_LEVELS):
@@ -1056,9 +1063,11 @@ def clear_lessons_admin(cls_key):
     return redirect(f"/admin?level={request.args.get('level','')}")
 
 @app.route('/admin', methods=["GET","POST"])
-@login_required
-def admin(nickname, user):
+def admin():
     global ADMIN_PASS, NOTICES, PINNED_NOTICE
+    nickname, user = get_user()
+    if not user:
+        return redirect("/login")
     level_filter = request.args.get('level')
     allowed_keys = None
     if level_filter and level_filter in ADMIN_LEVELS:
@@ -1074,8 +1083,6 @@ def admin(nickname, user):
     error = ""; bulk_result = ""
     q_target = request.args.get('q_target')
     l_target = request.args.get('l_target')
-    manage = request.args.get('manage')
-    edit_notice_id = request.args.get('edit_notice')
     with DBSession() as db:
         pending_reqs = db.execute(sa.text("SELECT * FROM payments WHERE status='Pending' ORDER BY id DESC")).mappings().all()
         complaints_pending = db.execute(sa.text("SELECT * FROM complaints ORDER BY id DESC LIMIT 50")).mappings().all()
@@ -1179,8 +1186,9 @@ def admin(nickname, user):
     return render_template_string(BASE, title="Admin", header=Markup(get_header(nickname,user, show_nav=False)), content=Markup(f"{error}{html}"), timer_script="")
 
 @app.route("/admin_attendance")
-@login_required
-def admin_attendance(nickname, user):
+def admin_attendance():
+    nickname, user = get_user()
+    if not user: return redirect("/login")
     if not session.get("admin_logged_in") and not any(session.get(f"admin_{l}_logged_in") for l in ADMIN_LEVELS):
         return redirect("/admin")
     level_filter = request.args.get('level')
